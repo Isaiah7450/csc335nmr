@@ -5,6 +5,17 @@
 ! prevent cyclic dependencies.
 module numeric_type_library
 implicit none
+  ! Constants
+  ! Constants for filter type.
+  integer, parameter :: No_Filter = 0
+  integer, parameter :: Boxcar_Filter = 1
+  integer, parameter :: SG_Filter = 2
+  ! Constants for integration method.
+  integer, parameter :: Newton_Cotes_Integration = 0
+  integer, parameter :: Romberg_Integration = 1
+  integer, parameter :: Adaptive_Integration = 2
+  integer, parameter :: Quadrature_Integration = 3
+
   ! This type is used to store a list of points for interpolation.
   type PointList
     ! The x-coordinates of the points
