@@ -2,13 +2,19 @@
 ! Created on: September 11, 2021
 ! This program helps one to find the roots of functions and equations.
 module root_finder_library
+use numeric_type_library
   implicit none
   double precision, parameter :: pi = 3.141592653589793238D0
 
   private :: secant_slope
 contains
   ! Uses the bisection algorithm to attempt to find a root.
-  ! f : function : The function to find the root of.
+  ! f : function : The function to find the root of. The provided interface
+  !   definition allows one to use an interpolation function on a list of
+  !   points. (For standard functions, the additional two arguments can be
+  !   ignored.)
+  ! points : PointList : The list of points to interpolate between. If
+  !   an analytic function is used, this argument can be whatever.
   ! x_min : double : The minimum domain value.
   ! x_max : double : The maximum domain value.
   ! guess : double : The initial guess for the root.
@@ -22,17 +28,21 @@ contains
   ! returns : double : The value of the root within the provided tolerance.
   !   If an error occurs, the error flag is set. If the error is not due
   !   to reaching the maximum iteration number, 0 is returned.
-  function bisect(f, x_min, x_max, guess, tolerance, err, iters) result(out)
+  function bisect(f, points, x_min, x_max, guess, tolerance, err, iters) result(out)
     implicit none
     ! It took me way too long to figure out how to specify the type
     ! of a function as an argument. I wonder if there is an easier
     ! way to specify this though as this is rather a lot.
     interface
-      pure function f(x) result(out)
+      pure function f(x, points, tolerance) result(out)
+        import PointList
         double precision, intent(in) :: x
+        type(PointList), intent(in) :: points
+        double precision, intent(in) :: tolerance
         double precision :: out
       end function f
     end interface
+    type(PointList), intent(in) :: points
     double precision, intent(in) :: x_min, x_max, guess, tolerance
     logical, intent(out) :: err
     integer, intent(inout) :: iters
@@ -68,8 +78,10 @@ contains
     max_iters = iters
     iters = 0
     ! Check for a sign change.
-    if ((f(x_min) > 0D0 .and. f(x_max) > 0D0) .or. &
-       (f(x_min) < 0D0 .and. f(x_max) < 0D0)) then
+    if ((f(x_min, points, tolerance) > 0D0 .and. &
+      f(x_max, points, tolerance) > 0D0) .or. &
+      (f(x_min, points, tolerance) < 0D0 .and. &
+      f(x_max, points, tolerance) < 0D0)) then
       print *, "Error: No sign change on domain."
       err = .true.
     endif
@@ -82,21 +94,20 @@ contains
     low = x_min
     high = x_max
     do while ((high - low) * 2D0 > tolerance)
-      f_low = f(low)
-      f_high = f(high)
-      f_curr = f(curr)
+      f_low = f(low, points, tolerance)
+      f_high = f(high, points, tolerance)
+      f_curr = f(curr, points, tolerance)
       ! If we have by some miracle stumbled upon the root,
       ! then we should just exit.
-      if (f_curr .eq. 0D0) then
-        exit
-      elseif (f_low .eq. 0D0) then
-        exit
-      elseif (f_high .eq. 0D0) then
-        exit
-      endif
+      !if (f_curr .eq. 0D0) then
+      !  exit
+      !elseif (f_low .eq. 0D0) then
+      !  exit
+      !elseif (f_high .eq. 0D0) then
+      !  exit
+      !endif
 
-      !print *, iters, low, curr, high, f_low, f_curr, f_high
-      print *, iters, low, curr, high, f_curr
+      !print *, iters, low, curr, high, f_curr
 
       iters = iters + 1
       if (iters > max_iters .and. max_iters .ne. 0) then
