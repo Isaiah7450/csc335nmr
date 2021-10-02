@@ -21,13 +21,14 @@ interface
   end subroutine validate_parameters
 end interface
 
-
-! We will get around to function-izing stuff later (hopefully).
 ! To start off, let's try reading program options from standard input.
 character(len = 40) :: input_name
 real(kind = 8) :: baseline_adjust, tolerance
 integer :: filter_type, filter_size, filter_passes, integration_method
 character(len = 40) :: output_name
+
+integer :: io_status
+integer, parameter :: input_unit = 17, output_unit = 18
 
 read *, input_name, baseline_adjust, tolerance
 read *, filter_type, filter_size, filter_passes
@@ -35,6 +36,52 @@ read *, integration_method, output_name
 call validate_parameters(tolerance, filter_type, &
   filter_size, filter_passes, integration_method) 
 
+! Open input file for reading.
+open(unit = input_unit, status = "old", access = "direct", &
+  form = "unformatted", recl = 1, file = input_name)
+! Open output file for writing. This will be function-ized later.
+! (First, check if it exists already and delete it if so.)
+open(unit = output_unit, status = "old", access = "sequential", &
+  form = "unformatted", recl = 1, iostat = io_status, file = output_name)
+if (io_status == 0) close(output_unit, status="delete")
+! Then open it for real.
+open(unit = output_unit, status = "new", file = output_name)
+! Print program options.
+write(output_unit, *) "==> NMR Analysis <=="
+write(output_unit, *) ""
+write(output_unit, *) "Program Options"
+write(output_unit, *) "Baseline Adjustment", ":", baseline_adjust
+write(output_unit, *) "Tolerance", ":", tolerance
+if (filter_type .eq. No_Filter) then
+  write(output_unit, *) "No Filtering"
+else
+  if (filter_type .eq. Boxcar_Filter) then
+    write(output_unit, *) "Boxcar Filtering"
+    write(output_unit, *) "Boxcar Size (Cyclic)", ":", filter_size
+    write(output_unit, *) "Boxcar Passes", ":", filter_passes
+  else
+    write(output_unit, *) "Savitzky-Golay Filtering"
+    write(output_unit, *) "Filter Size", ":", filter_size
+    write(output_unit, *) "Filter Passes", ":", filter_passes
+  endif
+endif
+write(output_unit, *) ""
+write(output_unit, *) "Integration Method"
+if (integration_method .eq. Newton_Cotes_Integration) then
+  write(output_unit, *) "Newton-Cotes Integration"
+elseif (integration_method .eq. Romberg_Integration) then
+  write(output_unit, *) "Romberg Integration"
+elseif (integration_method .eq. Adaptive_Integration) then
+  write(output_unit, *) "Adaptive Integration"
+else
+  write(output_unit, *) "Quadrature Integration"
+endif
+write(output_unit, *) ""
+write(output_unit, *) "Plot File Data"
+write(output_unit, *) "File", ":", input_name
+! Close files.
+close(output_unit)
+close(input_unit)
 end program main
 
 subroutine validate_parameters(tol, ft, fsize, passes, im)
