@@ -23,6 +23,8 @@ implicit none
     ! The corresponding function values. A 1-1 correspondence between
     ! x and y should exist (i.e.: they should be the same size.)
     real(kind = 8), dimension(:), allocatable :: y
+    ! The derivative information (if it is available) for each point.
+    real(kind = 8), dimension(:), allocatable :: y_prime
     ! The size of the list. This should match the dimensions of x and y.
     integer :: length
   end type PointList
