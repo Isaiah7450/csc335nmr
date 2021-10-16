@@ -98,6 +98,8 @@ call validate_parameters(tolerance, filter_type, &
   filter_size, filter_passes, integration_method) 
 call read_input(input_name, points)
 !print *, points%x
+
+call apply_filter(points, filter_type, filter_size, filter_passes)
 ! Open output file for writing. This will be function-ized later.
 ! (First, check if it exists already and delete it if so.)
 open(unit = output_unit, status = "old", access = "sequential", &
@@ -299,6 +301,27 @@ subroutine apply_boxcar_filter(points, filter_size, filter_passes)
   implicit none
   type(PointList), intent(inout) :: points
   integer, intent(in) :: filter_size, filter_passes
+
+  integer :: i, j, n
+  real(kind = 8), dimension(:), allocatable :: filtered_values
+  allocate(filtered_values(points%length))
+  do i = 1, filter_passes
+    filtered_values = 0D0
+    do j = 1, points%length
+      do n = 1, filter_size
+        ! Apply filter.
+        filtered_values(j) = filtered_values(j) &
+          + points%y(mod(j + n - 2 - filter_size / 2 &
+          + points%length, points%length) + 1)
+      enddo
+      filtered_values(j) = filtered_values(j) / filter_size
+    enddo
+    ! Copy transformed points back.
+    do n = 1, points%length
+      points%y(n) = filtered_values(n)
+    enddo
+  enddo
+  deallocate(filtered_values)
 end subroutine apply_boxcar_filter
 
 subroutine apply_sg_filter(points, filter_size, filter_passes)
