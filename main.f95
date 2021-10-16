@@ -19,26 +19,48 @@ interface
     real(kind = 8), intent(in) :: tol
     integer, intent(in) :: ft, fsize, passes, im
   end subroutine validate_parameters
+
+  ! This subroutine reads in the point data from an input file
+  ! and stores the data.
+  ! input_name : string : The name of the input file.
+  ! points : PointList : The data points information will be stored
+  !   in this parameter. The subroutine will allocate the needed memory;
+  !   the caller is responsible for handling clean up.
+  subroutine read_input(input_name, points)
+    use numeric_type_library
+    implicit none
+    character(len = 40), intent(in) :: input_name
+    type(PointList), intent(out) :: points
+  end subroutine read_input
+
+  ! This subroutine sorts the data points by x-value
+  ! in ascending order.
+  ! points : The list of node points to sort. The updated
+  !   list is then written back to this parameter.
+  subroutine sort_points(points)
+    use numeric_type_library
+    implicit none
+    type(PointList), intent(inout) :: points
+  end subroutine sort_points
 end interface
 
-! To start off, let's try reading program options from standard input.
 character(len = 40) :: input_name
 real(kind = 8) :: baseline_adjust, tolerance
 integer :: filter_type, filter_size, filter_passes, integration_method
 character(len = 40) :: output_name
 
 integer :: io_status
-integer, parameter :: input_unit = 17, output_unit = 18
+integer, parameter :: output_unit = 18
 
+type(PointList) :: points
+
+! To start off, let's try reading program options from standard input.
 read *, input_name, baseline_adjust, tolerance
 read *, filter_type, filter_size, filter_passes
 read *, integration_method, output_name
 call validate_parameters(tolerance, filter_type, &
   filter_size, filter_passes, integration_method) 
-
-! Open input file for reading.
-open(unit = input_unit, status = "old", access = "direct", &
-  form = "unformatted", recl = 1, file = input_name)
+call read_input(input_name, points)
 ! Open output file for writing. This will be function-ized later.
 ! (First, check if it exists already and delete it if so.)
 open(unit = output_unit, status = "old", access = "sequential", &
@@ -47,6 +69,7 @@ if (io_status == 0) close(output_unit, status="delete")
 ! Then open it for real.
 open(unit = output_unit, status = "new", file = output_name)
 ! Print program options.
+! @TODO: Place in subroutine.
 write(output_unit, *) "==> NMR Analysis <=="
 write(output_unit, *) ""
 write(output_unit, *) "Program Options"
@@ -79,9 +102,11 @@ endif
 write(output_unit, *) ""
 write(output_unit, *) "Plot File Data"
 write(output_unit, *) "File", ":", input_name
-! Close files.
+! Clean up resources.
 close(output_unit)
-close(input_unit)
+deallocate(points%y_prime)
+deallocate(points%y)
+deallocate(points%x)
 end program main
 
 subroutine validate_parameters(tol, ft, fsize, passes, im)
@@ -130,3 +155,92 @@ subroutine validate_parameters(tol, ft, fsize, passes, im)
     call exit(1)
   endif
 end subroutine validate_parameters
+
+subroutine read_input(input_name, points)
+  use numeric_type_library
+  implicit none
+  character(len = 40), intent(in) :: input_name
+  type(PointList), intent(out) :: points
+
+  integer, parameter :: input_unit = 17
+  integer :: n = 0
+  integer :: error
+  real(kind = 8) :: throwaway, throwaway2
+  character(len = 100) :: error_msg
+
+  ! Open input file for reading.
+  open(unit = input_unit, status = "old", access = "sequential", &
+    form = "formatted", recl=1, file = input_name)
+  ! The first time, we are just getting the number of points.
+  error = 0
+  do while (.true.)
+    read(input_unit, *, iostat=error, iomsg=error_msg) throwaway, throwaway2
+    if (error .eq. 0) then
+      n = n + 1
+    elseif (error .lt. 0) then
+      ! Reached end of file.
+      exit
+    else
+      ! Some other I/O error so just quit the program.
+      print *, "Error: An error occurred while reading ", input_name
+      print *, error_msg
+      call exit(1)
+    endif
+  enddo
+  ! Do allocations
+  ! Note the +1 since the last line triggers EOF and doesn't increment n.
+  allocate(points%x(n))
+  allocate(points%y(n))
+  allocate(points%y_prime(n))
+  points%length = n
+  close(input_unit)
+  ! Reopen file; there's probably a way to reset the file pointer
+  ! but I'm not concerned with looking that up right now.
+  open(unit = input_unit, status = "old", access = "sequential", &
+    form = "formatted", recl = 1, file = input_name)
+  error = 0
+  n = 1
+  do while (error .ne. -1)
+    read (input_unit, *, iostat=error) points%x(n), points%y(n)
+    ! Derivative data isn't currently available, but maybe it
+    ! would in the future.
+    if (n .eq. points%length) then
+      exit
+    elseif (error .eq. 0) then
+      n = n + 1
+    elseif (error .ne. 0) then
+      ! The first case should cover EOF, so this only happens
+      ! if some other I/O error occurs.
+      print *, "Error: An error occurred while reading ", input_name
+      print *, error_msg
+      call exit(1)
+      exit
+    endif
+  enddo
+  call sort_points(points)
+end subroutine read_input
+
+subroutine sort_points(points)
+  use numeric_type_library
+  implicit none
+  type(PointList), intent(inout) :: points
+  integer :: i, j
+  real(kind = 8) :: temp_x, temp_y, temp_y_prime
+  ! We will implement a simple bubble sort for now.
+  do i = 1, points%length
+    do j = 1, points%length
+      if (points%x(i) < points%x(j)) then
+        temp_x = points%x(i)
+        temp_y = points%y(i)
+        temp_y_prime = points%y_prime(i)
+        points%x(i) = points%x(j)
+        points%y(i) = points%y(j)
+        points%y_prime(i) = points%y_prime(j)
+        points%x(j) = temp_x
+        points%y(j) = temp_y
+        points%y_prime(j) = temp_y_prime
+      endif
+    enddo
+  enddo
+end subroutine sort_points
+
