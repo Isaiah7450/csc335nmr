@@ -43,6 +43,41 @@ interface
     implicit none
     type(PointList), intent(inout) :: points
   end subroutine sort_points
+
+  ! This subroutine applies the provided filter to the input points.
+  ! points : PointList : The list of node points.
+  ! filter_type : integer : The type of filter to apply.
+  ! filter_size : integer : The number of points to use in the filter.
+  ! filter_passes : integer : The number of times to recursively apply
+  !   the filter.
+  subroutine apply_filter(points, filter_type, filter_size, filter_passes)
+    use numeric_type_library
+    implicit none
+    type(PointList), intent(inout) :: points
+    integer, intent(in) :: filter_type, filter_size, filter_passes
+  end subroutine apply_filter
+
+  ! This subroutine applies a boxcar filter to the input points.
+  ! points : PointList : The list of node points.
+  ! filter_size : integer : The size of the filter to apply; should be odd.
+  ! filter_passes : integer : The number of passes to apply.
+  subroutine apply_boxcar_filter(points, filter_size, filter_passes)
+    use numeric_type_library
+    implicit none
+    type(PointList), intent(inout) :: points
+    integer, intent(in) :: filter_size, filter_passes
+  end subroutine apply_boxcar_filter
+
+  ! This subroutine applies a Savitzsky-Golay filter to the input points.
+  ! points : PointList : The list of node points.
+  ! filter_size : integer : The size of the filter; should be 5, 11, or 17.
+  ! filter_passes : integer : The number of passes to apply.
+  subroutine apply_sg_filter(points, filter_size, filter_passes)
+    use numeric_type_library
+    implicit none
+    type(PointList), intent(inout) :: points
+    integer, intent(in) :: filter_size, filter_passes
+  end subroutine apply_sg_filter
 end interface
 
 character(len = 40) :: input_name
@@ -246,3 +281,29 @@ subroutine sort_points(points)
   enddo
 end subroutine sort_points
 
+subroutine apply_filter(points, filter_type, filter_size, filter_passes)
+  use numeric_type_library
+  implicit none
+  type(PointList), intent(inout) :: points
+  integer, intent(in) :: filter_type, filter_size, filter_passes
+
+  if (filter_type .eq. Boxcar_Filter) then
+    call apply_boxcar_filter(points, filter_size, filter_passes)
+  elseif (filter_type .eq. SG_Filter) then
+    call apply_sg_filter(points, filter_size, filter_passes)
+  endif
+end subroutine apply_filter
+
+subroutine apply_boxcar_filter(points, filter_size, filter_passes)
+  use numeric_type_library
+  implicit none
+  type(PointList), intent(inout) :: points
+  integer, intent(in) :: filter_size, filter_passes
+end subroutine apply_boxcar_filter
+
+subroutine apply_sg_filter(points, filter_size, filter_passes)
+  use numeric_type_library
+  implicit none
+  type(PointList), intent(inout) :: points
+  integer, intent(in) :: filter_size, filter_passes
+end subroutine apply_sg_filter
