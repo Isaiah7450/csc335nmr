@@ -1,17 +1,8 @@
 ! Created by: Isaiah Hoffman
 ! Created on: October 1, 2021
 module interpolation_library
+use numeric_type_library
 implicit none
-  type PointList
-    ! The x-values of the points.
-    real(kind = 8), dimension(:), allocatable :: x
-    ! The corresponding function values.
-    real(kind = 8), dimension(:), allocatable :: y
-    ! The values of the derivatives at this point (if known).
-    real(kind = 8), dimension(:), allocatable :: y_prime
-    ! The number of points in the list.
-    integer :: length
-  end type PointList
 contains
 
 ! Computes the derivative by finding the secant slope in an interval

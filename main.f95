@@ -3,6 +3,7 @@
 program main
 use numeric_type_library
 use root_finder_library
+use interpolation_library
 implicit none
 
 interface
@@ -61,6 +62,7 @@ read *, integration_method, output_name
 call validate_parameters(tolerance, filter_type, &
   filter_size, filter_passes, integration_method) 
 call read_input(input_name, points)
+!print *, points%x
 ! Open output file for writing. This will be function-ized later.
 ! (First, check if it exists already and delete it if so.)
 open(unit = output_unit, status = "old", access = "sequential", &
