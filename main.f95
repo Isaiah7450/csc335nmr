@@ -329,4 +329,45 @@ subroutine apply_sg_filter(points, filter_size, filter_passes)
   implicit none
   type(PointList), intent(inout) :: points
   integer, intent(in) :: filter_size, filter_passes
+
+  integer :: i, j, k, M, ka, iters
+  real(kind = 8), dimension(:), allocatable :: filtered_values
+  real(kind = 8), dimension(:), allocatable :: np
+
+  allocate(np(filter_size))
+  do iters = 1, filter_passes
+    M = points%length - filter_size + 1
+    allocate(filtered_values(M))
+    do i = 2, filter_size
+      j = i - 1
+      np(i) = points%y(j)
+    enddo
+    do i = 1, M
+      j = i + filter_size - 1
+      do k = 1, filter_size - 1
+        ka = k + 1
+        np(k) = np(ka)
+        np(filter_size) = points%y(j)
+        ! 5, 11, 17
+        if (filter_size .eq. 5) then
+          ! (The weights come from table 1 in the paper.)
+          filtered_values(i) = -3D0 * (np(1) + np(5)) + 12D0 * (np(2) + np(4)) &
+            + 17D0 * np(3)
+          filtered_values(i) = filtered_values(i) / 35D0
+        elseif (filter_size .eq. 9) then
+          filtered_values(i) = 59D0 * np(5) + 54D0 * (np(4) + np(6)) &
+            + 39D0 * (np(3) + np(7)) + 14D0 * (np(2) + np(8)) &
+            - 21D0 * (np(1) + np(9))
+          ! (Just sum up the weights used.)
+          filtered_values(i) = filtered_values(i) / 231D0
+        endif
+      enddo
+    enddo
+    do i = 1, M
+      points%y(i) = filtered_values(i)
+    enddo
+    points%length = M
+    deallocate(filtered_values)
+  enddo
+  deallocate(np)
 end subroutine apply_sg_filter
