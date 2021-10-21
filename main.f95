@@ -92,11 +92,11 @@ else
 endif
 write(output_unit, *) ""
 write(output_unit, *) "Integration Method"
-if (integration_method .eq. Newton_Cotes_Integration) then
+if (integration_method .eq. Newton_Cotes_Integration_Method) then
   write(output_unit, *) "Newton-Cotes Integration"
-elseif (integration_method .eq. Romberg_Integration) then
+elseif (integration_method .eq. Romberg_Integration_Method) then
   write(output_unit, *) "Romberg Integration"
-elseif (integration_method .eq. Adaptive_Integration) then
+elseif (integration_method .eq. Adaptive_Integration_Method) then
   write(output_unit, *) "Adaptive Integration"
 else
   write(output_unit, *) "Quadrature Integration"
@@ -147,8 +147,10 @@ subroutine validate_parameters(tol, ft, fsize, passes, im)
     err = .true.
     print *, "Error: Number of filter passes should be zero."
   endif
-  if (im .ne. Newton_Cotes_Integration .and. im .ne. Romberg_Integration .and. &
-    im .ne. Adaptive_Integration .and. im .ne. Quadrature_Integration) then
+  if (im .ne. Newton_Cotes_Integration_Method &
+    .and. im .ne. Romberg_Integration_Method &
+    .and. im .ne. Adaptive_Integration_Method &
+    .and. im .ne. Quadrature_Integration_Method) then
     err = .true.
     print *, "Error: Integration method should be 0, 1, 2, or 3."
   endif

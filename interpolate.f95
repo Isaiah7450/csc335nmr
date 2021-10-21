@@ -5,57 +5,18 @@ use numeric_type_library
 implicit none
 contains
 
-! Computes the derivative by finding the secant slope in an interval
-!   when given a set of points. The interpolating function is found
-!   using Lagrange interpolation.
-! x : double : The point to evaluate the derivative at.
-! points : PointList : The list of points to interpolate between.
-! tolerance : double : The width of the interval to use for the secant
-!   computation.
-! returns : The approximate value of the derivative using Lagrange
-!   interpolation.
-pure function lagrange_secant_slope(x, points, tolerance) result(out)
-  real(kind = 8), intent(in) :: x
-  type(PointList), intent(in) :: points
-  real(kind = 8), intent(in) :: tolerance
-  real(kind = 8) :: out
-
-  out = lagrange_interpolation(points, x + tolerance / 2D0)
-  out = out - lagrange_interpolation(points, x - tolerance / 2D0)
-  out = out / ((x + tolerance / 2D0) - (x - tolerance / 2D0))
-end function
-
-! Computes the derivative by finding the secant slope in an interval
-!   when given a set of points. The interpolating function is found
-!   using natural cubic splines.
-! x : double : The point to evaluate the derivative at.
-! points : PointList : The list of points to interpolate between.
-! tolerance : double : The width of the interval to use for the secant
-!   computation.
-! returns : The approximate value of the derivative using Lagrange
-!   interpolation.
-pure function natural_spline_secant_slope(x, points, tolerance) result(out)
-  real(kind = 8), intent(in) :: x
-  type(PointList), intent(in) :: points
-  real(kind = 8), intent(in) :: tolerance
-  real(kind = 8) :: out
-
-  out = natural_cubic_spline_interpolation(points, x + tolerance / 2D0)
-  out = out - natural_cubic_spline_interpolation(points, x - tolerance / 2D0)
-  out = out / ((x + tolerance / 2D0) - (x - tolerance / 2D0))
-end function
-
 ! Uses Lagrange interpolation to estimate the value of a function
 ! at the provided x-value.
-! points : PointList : The list of known x and y values to interpolate
-!   between.
 ! x : double : The point to approximate the function value of using the provided
 !   data set.
+! points : PointList : The list of known x and y values to interpolate
+!   between.
+! tol : double : This parameter is ignored but kept for interface convenience.
 ! returns : double : The approximation for f(x) using Lagrange interpolation.
-pure function lagrange_interpolation(points, x) result(out)
+pure function lagrange_interpolation(x, points, tol) result(out)
   implicit none
   type(PointList), intent(in) :: points
-  real(kind = 8), intent(in) :: x
+  real(kind = 8), intent(in) :: x, tol
   real(kind = 8) :: out
 
   integer :: i, k, n
@@ -81,12 +42,12 @@ end function lagrange_interpolation
 
 ! Uses Newton's Divided Differences method to estimate the value of a
 ! function at a given point.
+! x : double : The point to approximate.
 ! points : PointList : The list of known x and y values to interpolate
 !   between.
-! x : double : The point to approximate.
 ! returns : double : The approximated function value at the point x
 !   using the divided differences algorithm.
-pure function divided_differences(points, x) result(out)
+pure function divided_differences(x, points) result(out)
   type(PointList), intent(in) :: points
   real(kind = 8), intent(in) :: x
   real(kind = 8) :: out
@@ -144,13 +105,13 @@ end subroutine divided_differences_coefficients
 
 ! Uses Hermite polynomial interpolation to estimate the value of a
 ! function at a given point.
+! x : double : The point to approximate.
 ! points : PointList : The list of known x and y values to interpolate
 !   between. The first derivatives at the given x points should also
 !   be included.
-! x : double : The point to approximate.
 ! returns : double : The approximated function value at the point x
 !   using Hermite interpolating polynomials.
-function hermite_interpolation(points, x) result(out)
+function hermite_interpolation(x, points) result(out)
   type(PointList), intent(in) :: points
   real(kind = 8), intent(in) :: x
   real(kind = 8) :: out
@@ -301,13 +262,13 @@ end subroutine natural_cubic_spline_all_coefficients
 
 ! Obtains the coefficients for the natural cubic spline that includes
 ! the point to be approximated.
+! x : The point to approximate using a cubic spline.
 ! points : The set of points to interpolate between. Note that it is
 !   assumed the points are sorted by x-value ascending.
-! x : The point to approximate using a cubic spline.
 ! out : The coefficients a, b, c, d as well as the value x_j are
 !   written to this value. It should be already allocated to be of
 !   size 5.
-pure subroutine natural_cubic_spline_coefficients(points, x, out)
+pure subroutine natural_cubic_spline_coefficients(x, points, out)
   type(PointList), intent(in) :: points
   real(kind = 8), intent(in) :: x
   ! Dimension is : for consistency across other interpolation functions
@@ -344,20 +305,21 @@ end subroutine natural_cubic_spline_coefficients
 
 ! Uses a natural cubic spline to estimate the value of a
 ! function at a given point.
+! x : double : The point to approximate.
 ! points : PointList : The list of known x and y values to interpolate
 !   between.
-! x : double : The point to approximate.
+! tol : double : This parameter is ignored but kept for interface convenience.
 ! returns : double : The approximated function value at the point x
 !   using the 
-pure function natural_cubic_spline_interpolation(points, x) result(out)
+pure function natural_cubic_spline_interpolation(x, points, tol) result(out)
   type(PointList), intent(in) :: points
-  real(kind = 8), intent(in) :: x
+  real(kind = 8), intent(in) :: x, tol
   real(kind = 8) :: out
 
   real(kind = 8), dimension(:), allocatable :: coefficients
 
   allocate(coefficients(5))
-  call natural_cubic_spline_coefficients(points, x, coefficients)
+  call natural_cubic_spline_coefficients(x, points, coefficients)
   out = coefficients(1)
   out = out + coefficients(2) * (x - coefficients(5))
   out = out + coefficients(3) * (x - coefficients(5)) ** 2
