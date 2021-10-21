@@ -360,6 +360,19 @@ subroutine apply_sg_filter(points, filter_size, filter_passes)
             - 21D0 * (np(1) + np(9))
           ! (Just sum up the weights used.)
           filtered_values(i) = filtered_values(i) / 231D0
+        elseif (filter_size .eq. 11) then
+          filtered_values(i) = -36D0 * (np(1) + np(11)) &
+            + 9D0 * (np(2) + np(10)) + 44D0 * (np(3) + np(9)) &
+            + 69D0 * (np(4) + np(8)) + 84D0 * (np(5) + np(7)) &
+            + 89D0 * (np(6))
+          filtered_values(i) = filtered_values(i) / 429D0
+        elseif (filter_size .eq. 17) then
+          filtered_values(i) = -21D0 * (np(1) + np(17)) &
+            - 6D0 * (np(2) + np(16)) + 7D0 * (np(3) + np(15)) &
+            + 18D0 * (np(4) + np(14)) + 27D0 * (np(5) + np(13)) &
+            + 34D0 * (np(6) + np(12)) + 39D0 * (np(7) + np(11)) &
+            + 42D0 * (np(8) + np(10)) + 43D0 * (np(9))
+          filtered_values(i) = filtered_values(i) / 323D0
         endif
       enddo
     enddo
