@@ -324,6 +324,7 @@ pure function natural_cubic_spline_interpolation(x, points, tol) result(out)
   out = out + coefficients(2) * (x - coefficients(5))
   out = out + coefficients(3) * (x - coefficients(5)) ** 2
   out = out + coefficients(4) * (x - coefficients(5)) ** 3
+  deallocate(coefficients)
 end function natural_cubic_spline_interpolation
 
 ! This subroutine obtains all of the natural cubic spline coefficients
