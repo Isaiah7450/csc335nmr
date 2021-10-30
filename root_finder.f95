@@ -4,7 +4,6 @@
 module root_finder_library
 use numeric_type_library
   implicit none
-  double precision, parameter :: pi = 3.141592653589793238D0
 
   private :: secant_slope
 contains
