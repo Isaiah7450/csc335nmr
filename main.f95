@@ -86,6 +86,8 @@ integer :: filter_type, filter_size, filter_passes, integration_method
 character(len = 40) :: output_name
 
 integer :: io_status
+! @TODO: Delete when finished testing.
+integer :: i
 integer, parameter :: output_unit = 18
 
 type(PointList) :: points
@@ -100,6 +102,11 @@ call read_input(input_name, points)
 !print *, points%x
 
 call apply_filter(points, filter_type, filter_size, filter_passes)
+! @TODO: Remove later: Testing code.
+do i = 1, points%length
+  print *, points%x(i), points%y(i)
+enddo
+
 ! Open output file for writing. This will be function-ized later.
 ! (First, check if it exists already and delete it if so.)
 open(unit = output_unit, status = "old", access = "sequential", &
@@ -330,57 +337,49 @@ subroutine apply_sg_filter(points, filter_size, filter_passes)
   type(PointList), intent(inout) :: points
   integer, intent(in) :: filter_size, filter_passes
 
-  integer :: i, j, k, M, ka, iters
+  integer :: i, j, iters
   real(kind = 8), dimension(:), allocatable :: filtered_values
-  real(kind = 8), dimension(:), allocatable :: np
-
-  allocate(np(filter_size))
+  ! So np came from their sample code which I later learned
+  ! is not the code we needed to implement, but I didn't want
+  ! to have to massively rewrite this section, so I kept it as-is.
+  real(kind = 8), dimension(filter_size) :: np
+  allocate(filtered_values(points%length))
   do iters = 1, filter_passes
-    M = points%length - filter_size + 1
-    allocate(filtered_values(M))
-    do i = 2, filter_size
-      j = i - 1
-      np(i) = points%y(j)
-    enddo
-    do i = 1, M
-      j = i + filter_size - 1
-      do k = 1, filter_size - 1
-        ka = k + 1
-        np(k) = np(ka)
-        np(filter_size) = points%y(j)
-        ! 5, 11, 17
-        if (filter_size .eq. 5) then
-          ! (The weights come from table 1 in the paper.)
-          filtered_values(i) = -3D0 * (np(1) + np(5)) + 12D0 * (np(2) + np(4)) &
-            + 17D0 * np(3)
-          filtered_values(i) = filtered_values(i) / 35D0
-        elseif (filter_size .eq. 9) then
-          filtered_values(i) = 59D0 * np(5) + 54D0 * (np(4) + np(6)) &
-            + 39D0 * (np(3) + np(7)) + 14D0 * (np(2) + np(8)) &
-            - 21D0 * (np(1) + np(9))
-          ! (Just sum up the weights used.)
-          filtered_values(i) = filtered_values(i) / 231D0
-        elseif (filter_size .eq. 11) then
-          filtered_values(i) = -36D0 * (np(1) + np(11)) &
-            + 9D0 * (np(2) + np(10)) + 44D0 * (np(3) + np(9)) &
-            + 69D0 * (np(4) + np(8)) + 84D0 * (np(5) + np(7)) &
-            + 89D0 * (np(6))
-          filtered_values(i) = filtered_values(i) / 429D0
-        elseif (filter_size .eq. 17) then
-          filtered_values(i) = -21D0 * (np(1) + np(17)) &
-            - 6D0 * (np(2) + np(16)) + 7D0 * (np(3) + np(15)) &
-            + 18D0 * (np(4) + np(14)) + 27D0 * (np(5) + np(13)) &
-            + 34D0 * (np(6) + np(12)) + 39D0 * (np(7) + np(11)) &
-            + 42D0 * (np(8) + np(10)) + 43D0 * (np(9))
-          filtered_values(i) = filtered_values(i) / 323D0
-        endif
+    do i = 1, points%length
+      do j = 1, filter_size
+        np(j) = points%y(mod(i + j - 2 - filter_size / 2 &
+          + points%length, points%length) + 1)
       enddo
+      ! 5, 11, 17
+      if (filter_size .eq. 5) then
+        ! (The weights come from table 1 in the paper.)
+        filtered_values(i) = -3D0 * (np(1) + np(5)) + 12D0 * (np(2) + np(4)) &
+          + 17D0 * np(3)
+        filtered_values(i) = filtered_values(i) / 35D0
+      elseif (filter_size .eq. 9) then
+        filtered_values(i) = 59D0 * np(5) + 54D0 * (np(4) + np(6)) &
+          + 39D0 * (np(3) + np(7)) + 14D0 * (np(2) + np(8)) &
+          - 21D0 * (np(1) + np(9))
+        ! (Just sum up the weights used.)
+        filtered_values(i) = filtered_values(i) / 231D0
+      elseif (filter_size .eq. 11) then
+        filtered_values(i) = -36D0 * (np(1) + np(11)) &
+          + 9D0 * (np(2) + np(10)) + 44D0 * (np(3) + np(9)) &
+          + 69D0 * (np(4) + np(8)) + 84D0 * (np(5) + np(7)) &
+          + 89D0 * (np(6))
+        filtered_values(i) = filtered_values(i) / 429D0
+      elseif (filter_size .eq. 17) then
+        filtered_values(i) = -21D0 * (np(1) + np(17)) &
+          - 6D0 * (np(2) + np(16)) + 7D0 * (np(3) + np(15)) &
+          + 18D0 * (np(4) + np(14)) + 27D0 * (np(5) + np(13)) &
+          + 34D0 * (np(6) + np(12)) + 39D0 * (np(7) + np(11)) &
+          + 42D0 * (np(8) + np(10)) + 43D0 * (np(9))
+        filtered_values(i) = filtered_values(i) / 323D0
+      endif
     enddo
-    do i = 1, M
+    do i = 1, points%length
       points%y(i) = filtered_values(i)
     enddo
-    points%length = M
-    deallocate(filtered_values)
   enddo
-  deallocate(np)
+  deallocate(filtered_values)
 end subroutine apply_sg_filter
