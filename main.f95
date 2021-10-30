@@ -291,7 +291,9 @@ character(len = 40) :: output_name
 
 integer :: io_status
 ! @TODO: Delete when finished testing.
-integer :: i
+integer :: i, num_points
+real(kind = 8) :: data_range
+
 integer, parameter :: output_unit = 18
 
 type(PointList) :: points
@@ -307,9 +309,14 @@ call read_input(input_name, points)
 
 call apply_filter(points, filter_type, filter_size, filter_passes)
 call adjust_baseline(points, baseline_adjust)
+
 ! @TODO: Remove later: Testing code.
-do i = 1, points%length
-  print *, points%x(i), points%y(i)
+num_points = 10000
+data_range = points%x(points%length) - points%x(1)
+do i = 1, num_points
+  print *, points%x(1) + i * data_range / num_points, &
+    natural_cubic_spline_interpolation(points%x(1) + i * data_range &
+      / num_points, points, tolerance)
 enddo
 
 ! Open output file for writing. This will be function-ized later.
