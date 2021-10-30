@@ -261,6 +261,19 @@ contains
     enddo
     deallocate(filtered_values)
   end subroutine apply_sg_filter
+
+  ! This subroutine adjusts all the points so that
+  ! only points above the baseline have a positive value.
+  ! points : PointList : The list of points to modify.
+  ! baseline : double : The location of the baseline.
+  subroutine adjust_baseline(points, baseline)
+    type(PointList), intent(inout) :: points
+    real(kind = 8), intent(in) :: baseline
+    integer :: i
+    do i = 1, points%length
+      points%y(i) = points%y(i) - baseline
+    enddo
+  end subroutine adjust_baseline
 end module main_module
 
 program main
@@ -293,6 +306,7 @@ call read_input(input_name, points)
 !print *, points%x
 
 call apply_filter(points, filter_type, filter_size, filter_passes)
+call adjust_baseline(points, baseline_adjust)
 ! @TODO: Remove later: Testing code.
 do i = 1, points%length
   print *, points%x(i), points%y(i)
