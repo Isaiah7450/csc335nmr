@@ -8,7 +8,8 @@ My_Flags := -g -Wall -Wextra -pedantic-errors
 
 $(Prog_Name).out: type_library.o root_finder.o interpolation.o \
   calculus.o main.o
-> gfortran $(My_Flags) type_library.o root_finder.o main.o -o $(Prog_Name).out
+> gfortran $(My_Flags) type_library.o root_finder.o \
+    interpolation.o calculus.o main.o -o $(Prog_Name).out
 
 type_library.o: type_library.f95
 > gfortran $(My_Flags) -c type_library.f95 -o type_library.o
