@@ -166,11 +166,23 @@ contains
     real(kind = 8), intent(in) :: baseline
     real(kind = 8) :: out
     real(kind = 8) :: start, finish
+    logical :: found_start
     integer :: i
     ! Search backwards for the starting and ending points.
     do i = points%length, 0, -1
+      if (.not. found_start) then
+        if (points%y(i) > baseline) then
+          finish = points%x(i)
+          found_start = .true.
+        endif
+      else
+        if (points%y(i) < baseline) then
+          start = points%x(i)
+          exit
+        endif
+      endif
     enddo
-    out = 1D0
+    out = (start + finish) / 2D0
   end function find_tms
 
   ! This subroutine adjusts the x-values of the points
