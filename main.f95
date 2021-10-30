@@ -43,6 +43,41 @@ interface
     implicit none
     type(PointList), intent(inout) :: points
   end subroutine sort_points
+
+  ! This subroutine applies the provided filter to the input points.
+  ! points : PointList : The list of node points.
+  ! filter_type : integer : The type of filter to apply.
+  ! filter_size : integer : The number of points to use in the filter.
+  ! filter_passes : integer : The number of times to recursively apply
+  !   the filter.
+  subroutine apply_filter(points, filter_type, filter_size, filter_passes)
+    use numeric_type_library
+    implicit none
+    type(PointList), intent(inout) :: points
+    integer, intent(in) :: filter_type, filter_size, filter_passes
+  end subroutine apply_filter
+
+  ! This subroutine applies a boxcar filter to the input points.
+  ! points : PointList : The list of node points.
+  ! filter_size : integer : The size of the filter to apply; should be odd.
+  ! filter_passes : integer : The number of passes to apply.
+  subroutine apply_boxcar_filter(points, filter_size, filter_passes)
+    use numeric_type_library
+    implicit none
+    type(PointList), intent(inout) :: points
+    integer, intent(in) :: filter_size, filter_passes
+  end subroutine apply_boxcar_filter
+
+  ! This subroutine applies a Savitzsky-Golay filter to the input points.
+  ! points : PointList : The list of node points.
+  ! filter_size : integer : The size of the filter; should be 5, 11, or 17.
+  ! filter_passes : integer : The number of passes to apply.
+  subroutine apply_sg_filter(points, filter_size, filter_passes)
+    use numeric_type_library
+    implicit none
+    type(PointList), intent(inout) :: points
+    integer, intent(in) :: filter_size, filter_passes
+  end subroutine apply_sg_filter
 end interface
 
 character(len = 40) :: input_name
@@ -63,6 +98,8 @@ call validate_parameters(tolerance, filter_type, &
   filter_size, filter_passes, integration_method) 
 call read_input(input_name, points)
 !print *, points%x
+
+call apply_filter(points, filter_type, filter_size, filter_passes)
 ! Open output file for writing. This will be function-ized later.
 ! (First, check if it exists already and delete it if so.)
 open(unit = output_unit, status = "old", access = "sequential", &
@@ -246,3 +283,104 @@ subroutine sort_points(points)
   enddo
 end subroutine sort_points
 
+subroutine apply_filter(points, filter_type, filter_size, filter_passes)
+  use numeric_type_library
+  implicit none
+  type(PointList), intent(inout) :: points
+  integer, intent(in) :: filter_type, filter_size, filter_passes
+
+  if (filter_type .eq. Boxcar_Filter) then
+    call apply_boxcar_filter(points, filter_size, filter_passes)
+  elseif (filter_type .eq. SG_Filter) then
+    call apply_sg_filter(points, filter_size, filter_passes)
+  endif
+end subroutine apply_filter
+
+subroutine apply_boxcar_filter(points, filter_size, filter_passes)
+  use numeric_type_library
+  implicit none
+  type(PointList), intent(inout) :: points
+  integer, intent(in) :: filter_size, filter_passes
+
+  integer :: i, j, n
+  real(kind = 8), dimension(:), allocatable :: filtered_values
+  allocate(filtered_values(points%length))
+  do i = 1, filter_passes
+    filtered_values = 0D0
+    do j = 1, points%length
+      do n = 1, filter_size
+        ! Apply filter.
+        filtered_values(j) = filtered_values(j) &
+          + points%y(mod(j + n - 2 - filter_size / 2 &
+          + points%length, points%length) + 1)
+      enddo
+      filtered_values(j) = filtered_values(j) / filter_size
+    enddo
+    ! Copy transformed points back.
+    do n = 1, points%length
+      points%y(n) = filtered_values(n)
+    enddo
+  enddo
+  deallocate(filtered_values)
+end subroutine apply_boxcar_filter
+
+subroutine apply_sg_filter(points, filter_size, filter_passes)
+  use numeric_type_library
+  implicit none
+  type(PointList), intent(inout) :: points
+  integer, intent(in) :: filter_size, filter_passes
+
+  integer :: i, j, k, M, ka, iters
+  real(kind = 8), dimension(:), allocatable :: filtered_values
+  real(kind = 8), dimension(:), allocatable :: np
+
+  allocate(np(filter_size))
+  do iters = 1, filter_passes
+    M = points%length - filter_size + 1
+    allocate(filtered_values(M))
+    do i = 2, filter_size
+      j = i - 1
+      np(i) = points%y(j)
+    enddo
+    do i = 1, M
+      j = i + filter_size - 1
+      do k = 1, filter_size - 1
+        ka = k + 1
+        np(k) = np(ka)
+        np(filter_size) = points%y(j)
+        ! 5, 11, 17
+        if (filter_size .eq. 5) then
+          ! (The weights come from table 1 in the paper.)
+          filtered_values(i) = -3D0 * (np(1) + np(5)) + 12D0 * (np(2) + np(4)) &
+            + 17D0 * np(3)
+          filtered_values(i) = filtered_values(i) / 35D0
+        elseif (filter_size .eq. 9) then
+          filtered_values(i) = 59D0 * np(5) + 54D0 * (np(4) + np(6)) &
+            + 39D0 * (np(3) + np(7)) + 14D0 * (np(2) + np(8)) &
+            - 21D0 * (np(1) + np(9))
+          ! (Just sum up the weights used.)
+          filtered_values(i) = filtered_values(i) / 231D0
+        elseif (filter_size .eq. 11) then
+          filtered_values(i) = -36D0 * (np(1) + np(11)) &
+            + 9D0 * (np(2) + np(10)) + 44D0 * (np(3) + np(9)) &
+            + 69D0 * (np(4) + np(8)) + 84D0 * (np(5) + np(7)) &
+            + 89D0 * (np(6))
+          filtered_values(i) = filtered_values(i) / 429D0
+        elseif (filter_size .eq. 17) then
+          filtered_values(i) = -21D0 * (np(1) + np(17)) &
+            - 6D0 * (np(2) + np(16)) + 7D0 * (np(3) + np(15)) &
+            + 18D0 * (np(4) + np(14)) + 27D0 * (np(5) + np(13)) &
+            + 34D0 * (np(6) + np(12)) + 39D0 * (np(7) + np(11)) &
+            + 42D0 * (np(8) + np(10)) + 43D0 * (np(9))
+          filtered_values(i) = filtered_values(i) / 323D0
+        endif
+      enddo
+    enddo
+    do i = 1, M
+      points%y(i) = filtered_values(i)
+    enddo
+    points%length = M
+    deallocate(filtered_values)
+  enddo
+  deallocate(np)
+end subroutine apply_sg_filter
