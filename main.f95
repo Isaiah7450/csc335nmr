@@ -157,6 +157,47 @@ contains
     enddo
   end subroutine sort_points
 
+  ! Finds the TMS peak of the provided points list.
+  ! points : PointList : The set of points to search.
+  ! baseline : double : The location of the baseline.
+  ! returns : double : The location of the TMS peak.
+  function find_tms(points, baseline) result(out)
+    type(PointList), intent(in) :: points
+    real(kind = 8), intent(in) :: baseline
+    real(kind = 8) :: out
+    real(kind = 8) :: start, finish
+    logical :: found_start
+    integer :: i
+    ! Search backwards for the starting and ending points.
+    do i = points%length, 0, -1
+      if (.not. found_start) then
+        if (points%y(i) > baseline) then
+          finish = points%x(i)
+          found_start = .true.
+        endif
+      else
+        if (points%y(i) < baseline) then
+          start = points%x(i)
+          exit
+        endif
+      endif
+    enddo
+    out = (start + finish) / 2D0
+  end function find_tms
+
+  ! This subroutine adjusts the x-values of the points
+  ! based on the location of the TMS peak.
+  ! points : PointList : The list of points to modify.
+  ! tms : double : The x-coordinate of the TMS peak.
+  subroutine adjust_tms(points, tms)
+    type(PointList), intent(inout) :: points
+    real(kind = 8), intent(in) :: tms
+    integer :: i
+    do i = 1, points%length
+      points%x(i) = points%x(i) - tms
+    enddo
+  end subroutine adjust_tms
+
   ! This subroutine applies the provided filter to the input points.
   ! points : PointList : The list of node points.
   ! filter_type : integer : The type of filter to apply.
@@ -275,6 +316,7 @@ character(len = 40) :: input_name
 real(kind = 8) :: baseline_adjust, tolerance
 integer :: filter_type, filter_size, filter_passes, integration_method
 character(len = 40) :: output_name
+real(kind = 8) :: tms_location
 
 integer :: io_status
 ! @TODO: Delete when finished testing.
@@ -291,7 +333,8 @@ call validate_parameters(tolerance, filter_type, &
   filter_size, filter_passes, integration_method) 
 call read_input(input_name, points)
 !print *, points%x
-
+tms_location = find_tms(points, baseline_adjust)
+call adjust_tms(points, tms_location)
 call apply_filter(points, filter_type, filter_size, filter_passes)
 ! @TODO: Remove later: Testing code.
 do i = 1, points%length
