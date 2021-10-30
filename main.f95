@@ -402,7 +402,8 @@ else
 endif
 write(output_unit, *) ""
 write(output_unit, *) "Plot File Data"
-write(output_unit, *) "File", ":", input_name
+write(output_unit, *) "File", ": ", input_name
+write(output_unit, *) "Plot shifted ", tms_location, " ppm for TMS calibration."
 ! Clean up resources.
 close(output_unit)
 deallocate(points%y_prime)
