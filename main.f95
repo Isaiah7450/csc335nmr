@@ -1,7 +1,52 @@
 ! Created by: Isaiah Hoffman
 ! Created on: September 28, 2021
+module utility_module
+implicit none
+  interface resize_list
+    module procedure resize_list_auto, resize_list_man
+  end interface resize_list
+contains
+  ! Resizes an array to have greater capacity. The new
+  ! size is determined automatically.
+  ! list : double array : The list to resize.
+  subroutine resize_list_auto(list)
+    real(kind = 8), dimension(:), allocatable, intent(inout) :: list
+    real(kind = 8), parameter :: growth_factor = 2D0
+    call resize_list(list, floor(size(list) * growth_factor))
+  end subroutine resize_list_auto
+
+  ! Resizes an array to have greater capacity. The new
+  ! size is passed as a parameter.
+  ! list : double array : The list to resize.
+  ! new_size : integer : The new size for the array. It should
+  !   be greater than the old size, but no checking is done.
+  subroutine resize_list_man(list, new_size)
+    real(kind = 8), dimension(:), allocatable, intent(inout) :: list
+    integer, intent(in) :: new_size
+    real(kind = 8), dimension(:), allocatable :: temp_list
+    integer :: i, old_size
+    old_size = size(list)
+    allocate(temp_list(new_size))
+    temp_list = 0D0
+    do i = 1, min(old_size, new_size)
+      temp_list(i) = list(i)
+    enddo
+    deallocate(list)
+    allocate(list(new_size))
+    list = 0D0
+    do i = 1, min(old_size, new_size)
+      list(i) = temp_list(i)
+    enddo
+    deallocate(temp_list)
+  end subroutine resize_list_man
+end module utility_module
+
 module main_module
 use numeric_type_library
+use utility_module
+use root_finder_library
+use interpolation_library
+use numerical_calculus_library
 implicit none
 contains
   ! Checks if the given parameters are valid. If not,
@@ -315,14 +360,73 @@ contains
       points%y(i) = points%y(i) - baseline
     enddo
   end subroutine adjust_baseline
+
+  ! Finds the start and end locations of the cubic spline's peaks.
+  ! points : PointList : The list of points that are used to create
+  !   the spline.
+  ! peak_list : double array : The set of peak locations are written
+  !   to this array in pairs. Odd indices correspond to starts and
+  !   even indices correspond to finishes.
+  ! tol : double : The tolerance for numerical algorithms.
+  subroutine find_peaks(points, peak_list, tol)
+    type(PointList), intent(in) :: points
+    real(kind = 8), dimension(:), allocatable, intent(out) :: peak_list
+    real(kind = 8), intent(in) :: tol
+    real(kind = 8) :: start, finish, guess, root
+    integer :: iterations, peak_index, i
+    logical :: err
+    integer, parameter :: initial_size = 26
+    allocate(peak_list(initial_size))
+    peak_index = 1
+    i = 1
+    do while (.true.)
+      ! Search for start.
+      do i = i, points%length
+        if (points%y(i) >= 0D0) exit
+      enddo
+      if (i > points%length) exit
+      ! Find start using bisection.
+      if (i .ne. 1) then
+        iterations = 0
+        guess = (points%x(i) + points%x(i - 1)) / 2D0
+        root = bisect(natural_cubic_spline_interpolation, &
+          points, points%x(i - 1), points%x(i), guess, tol, err, iterations)
+        start = root
+      else
+        start = points%x(1)
+      endif
+      ! Search for end.
+      do i = i, points%length
+        if (points%y(i) < 0D0) exit
+      enddo
+      ! Find actual finish using bisection.
+      iterations = 0
+      guess = (points%x(i) + points%x(i - 1)) / 2D0
+      root = bisect(natural_cubic_spline_interpolation, &
+        points, points%x(i - 1), points%x(i), guess, tol, err, iterations)
+      if (err) then
+        finish = points%x(points%length)
+      else
+        finish = root
+      endif
+      peak_list(peak_index) = start
+      peak_list(peak_index + 1) = finish
+      peak_index = peak_index + 2
+      if (peak_index + 1 .ge. size(peak_list)) then
+        call resize_list(peak_list)
+      endif
+    enddo
+    call resize_list(peak_list, peak_index - 1)
+  end subroutine find_peaks
 end module main_module
 
+
 program main
-use main_module
-use numerical_calculus_library
 use numeric_type_library
 use root_finder_library
 use interpolation_library
+use numerical_calculus_library
+use main_module
 implicit none
 
 character(len = 40) :: input_name
@@ -330,6 +434,7 @@ real(kind = 8) :: baseline_adjust, tolerance
 integer :: filter_type, filter_size, filter_passes, integration_method
 character(len = 40) :: output_name
 real(kind = 8) :: tms_location
+real(kind = 8), dimension(:), allocatable :: peak_list
 
 integer :: io_status
 ! @TODO: Delete when finished testing.
@@ -352,16 +457,17 @@ tms_location = find_tms(points, baseline_adjust)
 call adjust_tms(points, tms_location)
 call apply_filter(points, filter_type, filter_size, filter_passes)
 call adjust_baseline(points, baseline_adjust)
-
+call find_peaks(points, peak_list, tolerance)
 ! @TODO: Remove later: Testing code.
 num_points = 10000
 data_range = points%x(points%length) - points%x(1)
-do i = 1, num_points
-  print *, points%x(1) + i * data_range / num_points, &
-    natural_cubic_spline_interpolation(points%x(1) + i * data_range &
-      / num_points, points, tolerance)
-enddo
-
+!print *, points%x
+!do i = 1, num_points
+!  print *, points%x(1) + i * data_range / num_points, &
+!    natural_cubic_spline_interpolation(points%x(1) + i * data_range &
+!      / num_points, points, tolerance)
+!enddo
+print *, peak_list
 ! Open output file for writing. This will be function-ized later.
 ! (First, check if it exists already and delete it if so.)
 open(unit = output_unit, status = "old", access = "sequential", &
@@ -404,6 +510,16 @@ write(output_unit, *) ""
 write(output_unit, *) "Plot File Data"
 write(output_unit, *) "File", ": ", input_name
 write(output_unit, *) "Plot shifted ", tms_location, " ppm for TMS calibration."
+write(output_unit, *) ""
+write(output_unit, *) ""
+! If nothing else, this definitely should be put in some subroutine.
+write(output_unit, *) "Peak | Begin | End | Location | Top | Area | Hydrogen"
+do i = 1, size(peak_list) / 2
+  write(output_unit, *) i, peak_list(i * 2 - 1), peak_list(i * 2), &
+    (peak_list(i * 2) + peak_list(i * 2 - 1)) / 2D0, &
+    ! Will write the correct values for these later.
+    0D0, 0D0, 0
+enddo
 ! Clean up resources.
 close(output_unit)
 deallocate(points%y_prime)
