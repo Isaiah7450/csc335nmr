@@ -418,8 +418,83 @@ contains
     enddo
     call resize_list(peak_list, peak_index - 1)
   end subroutine find_peaks
-end module main_module
 
+  ! Computes the area of each peak using the provided method. 
+  ! method : IntegrationMethod : Integration method. Should be 0, 1, 2, or 3.
+  ! points : PointList : The set of points used to make the cubic spline.
+  ! tol : double : The tolerance to use for the numerical algorithm.
+  ! peak_list : double array : A list of peak starts and peak finishs.
+  !   The size of the list should be even.
+  ! peak_areas : double array : This array will be filled with the areas
+  !   of each peak.
+  subroutine compute_peak_areas(method, points, tol, peak_list, peak_areas)
+    integer, intent(in) :: method
+    type(PointList), intent(in) :: points
+    real(kind = 8), intent(in) :: tol
+    real(kind = 8), dimension(:), intent(in) :: peak_list
+    real(kind = 8), dimension(:), allocatable, intent(out) :: peak_areas
+    integer :: i
+    real(kind = 8) :: a, b
+    allocate(peak_areas(size(peak_list) / 2))
+    do i = 1, size(peak_list) / 2
+      a = peak_list(i * 2 - 1)
+      b = peak_list(i * 2)
+      select case (method)
+      case (Newton_Cotes_Integration_Method)
+        peak_areas(i) &
+          = composite_simpson_rule(natural_cubic_spline_interpolation, &
+            a, points, tol, b)
+      case (Romberg_Integration_Method)
+        peak_areas(i) &
+          = romberg_integration(natural_cubic_spline_interpolation, &
+            a, points, tol, b)
+      case (Adaptive_Integration_Method)
+        peak_areas(i) &
+          = adaptive_quadrature(natural_cubic_spline_interpolation, &
+            a, points, tol, b)
+      case (Quadrature_Integration_Method)
+        ! Might want to dictate size based on the tolerance...
+        peak_areas(i) &
+          = gauss_legendre_quadrature(natural_cubic_spline_interpolation, &
+            a, points, tol, b, 5)
+      end select
+    enddo
+  end subroutine compute_peak_areas
+
+  ! Writes the information about the peak locations to the output file.
+  ! output_unit : integer : The unit number associated with the output file.
+  ! points : PointList : The set of points to interpolate between.
+  ! baseline : double : The baseline for the NMR.
+  ! peak_list : double array : An array that specifies the starting and
+  !   and ending locations of each peak.
+  ! peak_areas : double array : An array that specifies the areas of each
+  !   peak using the appropriate integration method.
+  subroutine write_peak_info(output_unit, points, baseline, peak_list, peak_areas)
+    integer, intent(in) :: output_unit
+    type(PointList), intent(in) :: points
+    real(kind = 8), intent(in) :: baseline
+    real(kind = 8), dimension(:), allocatable, intent(in) :: peak_list, peak_areas
+    real(kind = 8) :: middle, smallest_area
+    integer :: i
+    ! I can most likely remove this once I actually compute the peak
+    ! areas.
+    if (allocated(peak_areas) .and. size(peak_areas) > 0) then
+      smallest_area = peak_areas(1)
+      do i = 1, size(peak_areas)
+        if (peak_areas(i) < smallest_area) smallest_area = peak_areas(i)
+      enddo
+    endif
+    write(output_unit, *) "Peak | Begin | End | Location | Top | Area | Hydrogen"
+    do i = 1, size(peak_list) / 2
+      middle = peak_list(i * 2 - 1) + peak_list(i * 2)
+      middle = middle / 2D0
+      write(output_unit, *) i, peak_list(i * 2 - 1), peak_list(i * 2), &
+        middle, &
+        natural_cubic_spline_interpolation(middle, points, 0D0) + baseline, &
+        peak_areas(i), nint(peak_areas(i) / smallest_area)
+    enddo
+  end subroutine write_peak_info
+end module main_module
 
 program main
 use numeric_type_library
@@ -433,17 +508,13 @@ character(len = 40) :: input_name
 real(kind = 8) :: baseline_adjust, tolerance
 integer :: filter_type, filter_size, filter_passes, integration_method
 character(len = 40) :: output_name
-real(kind = 8) :: tms_location
-real(kind = 8), dimension(:), allocatable :: peak_list
-
-integer :: io_status
-! @TODO: Delete when finished testing.
-integer :: i, num_points
-real(kind = 8) :: data_range
 
 integer, parameter :: output_unit = 18
-
 type(PointList) :: points
+real(kind = 8) :: tms_location
+real(kind = 8), dimension(:), allocatable :: peak_list, peak_areas
+
+integer :: io_status
 
 ! To start off, let's try reading program options from standard input.
 read *, input_name, baseline_adjust, tolerance
@@ -458,16 +529,8 @@ call adjust_tms(points, tms_location)
 call apply_filter(points, filter_type, filter_size, filter_passes)
 call adjust_baseline(points, baseline_adjust)
 call find_peaks(points, peak_list, tolerance)
-! @TODO: Remove later: Testing code.
-num_points = 10000
-data_range = points%x(points%length) - points%x(1)
-!print *, points%x
-!do i = 1, num_points
-!  print *, points%x(1) + i * data_range / num_points, &
-!    natural_cubic_spline_interpolation(points%x(1) + i * data_range &
-!      / num_points, points, tolerance)
-!enddo
-print *, peak_list
+call compute_peak_areas(integration_method, points, tolerance, &
+  peak_list, peak_areas)
 ! Open output file for writing. This will be function-ized later.
 ! (First, check if it exists already and delete it if so.)
 open(unit = output_unit, status = "old", access = "sequential", &
@@ -512,14 +575,8 @@ write(output_unit, *) "File", ": ", input_name
 write(output_unit, *) "Plot shifted ", tms_location, " ppm for TMS calibration."
 write(output_unit, *) ""
 write(output_unit, *) ""
-! If nothing else, this definitely should be put in some subroutine.
-write(output_unit, *) "Peak | Begin | End | Location | Top | Area | Hydrogen"
-do i = 1, size(peak_list) / 2
-  write(output_unit, *) i, peak_list(i * 2 - 1), peak_list(i * 2), &
-    (peak_list(i * 2) + peak_list(i * 2 - 1)) / 2D0, &
-    ! Will write the correct values for these later.
-    0D0, 0D0, 0
-enddo
+call write_peak_info(output_unit, points, baseline_adjust, peak_list, &
+  peak_areas)
 ! Clean up resources.
 close(output_unit)
 deallocate(points%y_prime)
