@@ -419,6 +419,48 @@ contains
     call resize_list(peak_list, peak_index - 1)
   end subroutine find_peaks
 
+  ! Computes the area of each peak using the provided method. 
+  ! method : IntegrationMethod : Integration method. Should be 0, 1, 2, or 3.
+  ! points : PointList : The set of points used to make the cubic spline.
+  ! tol : double : The tolerance to use for the numerical algorithm.
+  ! peak_list : double array : A list of peak starts and peak finishs.
+  !   The size of the list should be even.
+  ! peak_areas : double array : This array will be filled with the areas
+  !   of each peak.
+  subroutine compute_peak_areas(method, points, tol, peak_list, peak_areas)
+    integer, intent(in) :: method
+    type(PointList), intent(in) :: points
+    real(kind = 8), intent(in) :: tol
+    real(kind = 8), dimension(:), intent(in) :: peak_list
+    real(kind = 8), dimension(:), allocatable, intent(out) :: peak_areas
+    integer :: i
+    real(kind = 8) :: a, b
+    allocate(peak_areas(size(peak_list) / 2))
+    do i = 1, size(peak_list) / 2
+      a = peak_list(i * 2 - 1)
+      b = peak_list(i * 2)
+      select case (method)
+      case (Newton_Cotes_Integration_Method)
+        peak_areas(i) &
+          = composite_simpson_rule(natural_cubic_spline_interpolation, &
+            a, points, tol, b)
+      case (Romberg_Integration_Method)
+        peak_areas(i) &
+          = romberg_integration(natural_cubic_spline_interpolation, &
+            a, points, tol, b)
+      case (Adaptive_Integration_Method)
+        peak_areas(i) &
+          = adaptive_quadrature(natural_cubic_spline_interpolation, &
+            a, points, tol, b)
+      case (Quadrature_Integration_Method)
+        ! Might want to dictate size based on the tolerance...
+        peak_areas(i) &
+          = gauss_legendre_quadrature(natural_cubic_spline_interpolation, &
+            a, points, tol, b, 5)
+      end select
+    enddo
+  end subroutine compute_peak_areas
+
   ! Writes the information about the peak locations to the output file.
   ! output_unit : integer : The unit number associated with the output file.
   ! points : PointList : The set of points to interpolate between.
@@ -449,9 +491,7 @@ contains
       write(output_unit, *) i, peak_list(i * 2 - 1), peak_list(i * 2), &
         middle, &
         natural_cubic_spline_interpolation(middle, points, 0D0) + baseline, &
-        ! @TODO: Write the correct values later.
-        0D0, 0D0
-        !peak_areas(i), round(peak_areas(i) / smallest_area)
+        peak_areas(i), nint(peak_areas(i) / smallest_area)
     enddo
   end subroutine write_peak_info
 end module main_module
@@ -494,6 +534,8 @@ call adjust_tms(points, tms_location)
 call apply_filter(points, filter_type, filter_size, filter_passes)
 call adjust_baseline(points, baseline_adjust)
 call find_peaks(points, peak_list, tolerance)
+call compute_peak_areas(integration_method, points, tolerance, &
+  peak_list, peak_areas)
 ! @TODO: Remove later: Testing code.
 num_points = 10000
 data_range = points%x(points%length) - points%x(1)
