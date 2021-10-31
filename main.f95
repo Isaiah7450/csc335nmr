@@ -28,13 +28,13 @@ contains
     old_size = size(list)
     allocate(temp_list(new_size))
     temp_list = 0D0
-    do i = 1, old_size
+    do i = 1, min(old_size, new_size)
       temp_list(i) = list(i)
     enddo
     deallocate(list)
     allocate(list(new_size))
     list = 0D0
-    do i = 1, old_size
+    do i = 1, min(old_size, new_size)
       list(i) = temp_list(i)
     enddo
     deallocate(temp_list)
