@@ -1,7 +1,49 @@
 ! Created by: Isaiah Hoffman
 ! Created on: September 28, 2021
+module utility_module
+implicit none
+  interface resize_list
+    module procedure resize_list_auto, resize_list_man
+  end interface resize_list
+contains
+  ! Resizes an array to have greater capacity. The new
+  ! size is determined automatically.
+  ! list : double array : The list to resize.
+  subroutine resize_list_auto(list)
+    real(kind = 8), dimension(:), allocatable, intent(inout) :: list
+    real(kind = 8), parameter :: growth_factor = 2D0
+    call resize_list(list, floor(size(list) * growth_factor))
+  end subroutine resize_list_auto
+
+  ! Resizes an array to have greater capacity. The new
+  ! size is passed as a parameter.
+  ! list : double array : The list to resize.
+  ! new_size : integer : The new size for the array. It should
+  !   be greater than the old size, but no checking is done.
+  subroutine resize_list_man(list, new_size)
+    real(kind = 8), dimension(:), allocatable, intent(inout) :: list
+    integer, intent(in) :: new_size
+    real(kind = 8), dimension(:), allocatable :: temp_list
+    integer :: i, old_size
+    old_size = size(list)
+    allocate(temp_list(new_size))
+    temp_list = 0D0
+    do i = 1, old_size
+      temp_list(i) = list(i)
+    enddo
+    deallocate(list)
+    allocate(list(new_size))
+    list = 0D0
+    do i = 1, old_size
+      list(i) = temp_list(i)
+    enddo
+    deallocate(temp_list)
+  end subroutine resize_list_man
+end module utility_module
+
 module main_module
 use numeric_type_library
+use utility_module
 use root_finder_library
 use interpolation_library
 use numerical_calculus_library
@@ -319,61 +361,48 @@ contains
     enddo
   end subroutine adjust_baseline
 
-  ! Finds the peaks
-  subroutine find_peaks(points, peak_list)
+  ! Finds the start and end locations of the cubic spline's peaks.
+  ! points : PointList : The list of points that are used to create
+  !   the spline.
+  ! peak_list : double array : The set of peak locations are written
+  !   to this array in pairs. Odd indices correspond to starts and
+  !   even indices correspond to finishes.
+  ! tol : double : The tolerance for numerical algorithms.
+  subroutine find_peaks(points, peak_list, tol)
     type(PointList), intent(in) :: points
     real(kind = 8), dimension(:), allocatable, intent(out) :: peak_list
-    real(kind = 8) :: start, finish
-    ! These are for resizing. I really should make this some sort
-    ! of library subroutine.
-    integer, parameter :: initial_size = 25
-    real(kind = 8), dimension(:), allocatable :: temp_list
-    real(kind = 8), parameter :: growth_factor = 1.5D0
-
+    real(kind = 8), intent(in) :: tol
+    real(kind = 8) :: start, finish, guess, root
+    integer :: iterations, peak_index
+    logical :: err
+    integer, parameter :: initial_size = 26
     allocate(peak_list(initial_size))
+    ! Going to have to think more about how I want to do
+    ! the initial guess and domain.
+    start = points%x(1)
+    finish = points%x(points%length)
+    guess = points%x(1)
+    peak_index = 1
+    do while (.true.)
+      iterations = 0
+      root = bisect(natural_cubic_spline_interpolation, &
+        points, start, finish, guess, tol, err, iterations)
+      if (err) then
+        exit
+      endif
+      peak_list(peak_index) = root
+      start = root
+      guess = root
+      if (peak_index .eq. size(peak_list)) then
+        call resize_list(peak_list)
+      endif
+      peak_index = peak_index + 1
+      !if (mod(peak_index, 2) .eq. 1) then
+      !endif
+    enddo
   end subroutine find_peaks
 end module main_module
 
-module utility_module
-implicit none
-  interface resize_list
-    module procedure resize_list_auto, resize_list_man
-  end interface resize_list
-contains
-  ! Resizes an array to have greater capacity. The new
-  ! size is determined automatically.
-  ! list : double array : The list to resize.
-  subroutine resize_list_auto(list)
-    real(kind = 8), dimension(:), allocatable, intent(inout) :: list
-    real(kind = 8), parameter :: growth_factor = 1.5D0
-    call resize_list(list, floor(size(list) * growth_factor))
-  end subroutine resize_list_auto
-
-  ! Resizes an array to have greater capacity. The new
-  ! size is passed as a parameter.
-  ! list : double array : The list to resize.
-  ! new_size : integer : The new size for the array. It should
-  !   be greater than the old size, but no checking is done.
-  subroutine resize_list_man(list, new_size)
-    real(kind = 8), dimension(:), allocatable, intent(inout) :: list
-    integer, intent(in) :: new_size
-    real(kind = 8), dimension(:), allocatable :: temp_list
-    integer :: i, old_size
-    old_size = size(list)
-    allocate(temp_list(new_size))
-    temp_list = 0D0
-    do i = 1, old_size
-      temp_list(i) = list(i)
-    enddo
-    deallocate(list)
-    allocate(list(new_size))
-    list = 0D0
-    do i = 1, old_size
-      list(i) = temp_list(i)
-    enddo
-    deallocate(temp_list)
-  end subroutine resize_list_man
-end module utility_module
 
 program main
 use numeric_type_library
@@ -411,15 +440,16 @@ tms_location = find_tms(points, baseline_adjust)
 call adjust_tms(points, tms_location)
 call apply_filter(points, filter_type, filter_size, filter_passes)
 call adjust_baseline(points, baseline_adjust)
-
+call find_peaks(points, peak_list, tolerance)
+print *, peak_list
 ! @TODO: Remove later: Testing code.
-num_points = 10000
-data_range = points%x(points%length) - points%x(1)
-do i = 1, num_points
-  print *, points%x(1) + i * data_range / num_points, &
-    natural_cubic_spline_interpolation(points%x(1) + i * data_range &
-      / num_points, points, tolerance)
-enddo
+!num_points = 10000
+!data_range = points%x(points%length) - points%x(1)
+!do i = 1, num_points
+!  print *, points%x(1) + i * data_range / num_points, &
+!    natural_cubic_spline_interpolation(points%x(1) + i * data_range &
+!      / num_points, points, tolerance)
+!enddo
 
 ! Open output file for writing. This will be function-ized later.
 ! (First, check if it exists already and delete it if so.)
