@@ -2,6 +2,9 @@
 ! Created on: September 28, 2021
 module main_module
 use numeric_type_library
+use root_finder_library
+use interpolation_library
+use numerical_calculus_library
 implicit none
 contains
   ! Checks if the given parameters are valid. If not,
@@ -315,14 +318,69 @@ contains
       points%y(i) = points%y(i) - baseline
     enddo
   end subroutine adjust_baseline
+
+  ! Finds the peaks
+  subroutine find_peaks(points, peak_list)
+    type(PointList), intent(in) :: points
+    real(kind = 8), dimension(:), allocatable, intent(out) :: peak_list
+    real(kind = 8) :: start, finish
+    ! These are for resizing. I really should make this some sort
+    ! of library subroutine.
+    integer, parameter :: initial_size = 25
+    real(kind = 8), dimension(:), allocatable :: temp_list
+    real(kind = 8), parameter :: growth_factor = 1.5D0
+
+    allocate(peak_list(initial_size))
+  end subroutine find_peaks
 end module main_module
 
+module utility_module
+implicit none
+  interface resize_list
+    module procedure resize_list_auto, resize_list_man
+  end interface resize_list
+contains
+  ! Resizes an array to have greater capacity. The new
+  ! size is determined automatically.
+  ! list : double array : The list to resize.
+  subroutine resize_list_auto(list)
+    real(kind = 8), dimension(:), allocatable, intent(inout) :: list
+    real(kind = 8), parameter :: growth_factor = 1.5D0
+    call resize_list(list, floor(size(list) * growth_factor))
+  end subroutine resize_list_auto
+
+  ! Resizes an array to have greater capacity. The new
+  ! size is passed as a parameter.
+  ! list : double array : The list to resize.
+  ! new_size : integer : The new size for the array. It should
+  !   be greater than the old size, but no checking is done.
+  subroutine resize_list_man(list, new_size)
+    real(kind = 8), dimension(:), allocatable, intent(inout) :: list
+    integer, intent(in) :: new_size
+    real(kind = 8), dimension(:), allocatable :: temp_list
+    integer :: i, old_size
+    old_size = size(list)
+    allocate(temp_list(new_size))
+    temp_list = 0D0
+    do i = 1, old_size
+      temp_list(i) = list(i)
+    enddo
+    deallocate(list)
+    allocate(list(new_size))
+    list = 0D0
+    do i = 1, old_size
+      list(i) = temp_list(i)
+    enddo
+    deallocate(temp_list)
+  end subroutine resize_list_man
+end module utility_module
+
 program main
-use main_module
-use numerical_calculus_library
 use numeric_type_library
 use root_finder_library
 use interpolation_library
+use numerical_calculus_library
+use main_module
 implicit none
 
 character(len = 40) :: input_name
@@ -330,6 +388,7 @@ real(kind = 8) :: baseline_adjust, tolerance
 integer :: filter_type, filter_size, filter_passes, integration_method
 character(len = 40) :: output_name
 real(kind = 8) :: tms_location
+real(kind = 8), dimension(:), allocatable :: peak_list
 
 integer :: io_status
 ! @TODO: Delete when finished testing.
