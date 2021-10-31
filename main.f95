@@ -418,6 +418,42 @@ contains
     enddo
     call resize_list(peak_list, peak_index - 1)
   end subroutine find_peaks
+
+  ! Writes the information about the peak locations to the output file.
+  ! output_unit : integer : The unit number associated with the output file.
+  ! points : PointList : The set of points to interpolate between.
+  ! baseline : double : The baseline for the NMR.
+  ! peak_list : double array : An array that specifies the starting and
+  !   and ending locations of each peak.
+  ! peak_areas : double array : An array that specifies the areas of each
+  !   peak using the appropriate integration method.
+  subroutine write_peak_info(output_unit, points, baseline, peak_list, peak_areas)
+    integer, intent(in) :: output_unit
+    type(PointList), intent(in) :: points
+    real(kind = 8), intent(in) :: baseline
+    real(kind = 8), dimension(:), allocatable, intent(in) :: peak_list, peak_areas
+    real(kind = 8) :: middle, smallest_area
+    integer :: i
+    ! I can most likely remove this once I actually compute the peak
+    ! areas.
+    if (allocated(peak_areas) .and. size(peak_areas) > 0) then
+      smallest_area = peak_areas(1)
+      do i = 1, size(peak_areas)
+        if (peak_areas(i) < smallest_area) smallest_area = peak_areas(i)
+      enddo
+    endif
+    write(output_unit, *) "Peak | Begin | End | Location | Top | Area | Hydrogen"
+    do i = 1, size(peak_list) / 2
+      middle = peak_list(i * 2 - 1) + peak_list(i * 2)
+      middle = middle / 2D0
+      write(output_unit, *) i, peak_list(i * 2 - 1), peak_list(i * 2), &
+        middle, &
+        natural_cubic_spline_interpolation(middle, points, 0D0) + baseline, &
+        ! @TODO: Write the correct values later.
+        0D0, 0D0
+        !peak_areas(i), round(peak_areas(i) / smallest_area)
+    enddo
+  end subroutine write_peak_info
 end module main_module
 
 
@@ -433,17 +469,17 @@ character(len = 40) :: input_name
 real(kind = 8) :: baseline_adjust, tolerance
 integer :: filter_type, filter_size, filter_passes, integration_method
 character(len = 40) :: output_name
+
+integer, parameter :: output_unit = 18
+type(PointList) :: points
 real(kind = 8) :: tms_location
-real(kind = 8), dimension(:), allocatable :: peak_list
+real(kind = 8), dimension(:), allocatable :: peak_list, peak_areas
 
 integer :: io_status
 ! @TODO: Delete when finished testing.
 integer :: i, num_points
 real(kind = 8) :: data_range
 
-integer, parameter :: output_unit = 18
-
-type(PointList) :: points
 
 ! To start off, let's try reading program options from standard input.
 read *, input_name, baseline_adjust, tolerance
@@ -512,14 +548,8 @@ write(output_unit, *) "File", ": ", input_name
 write(output_unit, *) "Plot shifted ", tms_location, " ppm for TMS calibration."
 write(output_unit, *) ""
 write(output_unit, *) ""
-! If nothing else, this definitely should be put in some subroutine.
-write(output_unit, *) "Peak | Begin | End | Location | Top | Area | Hydrogen"
-do i = 1, size(peak_list) / 2
-  write(output_unit, *) i, peak_list(i * 2 - 1), peak_list(i * 2), &
-    (peak_list(i * 2) + peak_list(i * 2 - 1)) / 2D0, &
-    ! Will write the correct values for these later.
-    0D0, 0D0, 0
-enddo
+call write_peak_info(output_unit, points, baseline_adjust, peak_list, &
+  peak_areas)
 ! Clean up resources.
 close(output_unit)
 deallocate(points%y_prime)
