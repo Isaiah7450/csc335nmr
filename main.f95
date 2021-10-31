@@ -496,7 +496,6 @@ contains
   end subroutine write_peak_info
 end module main_module
 
-
 program main
 use numeric_type_library
 use root_finder_library
@@ -516,10 +515,6 @@ real(kind = 8) :: tms_location
 real(kind = 8), dimension(:), allocatable :: peak_list, peak_areas
 
 integer :: io_status
-! @TODO: Delete when finished testing.
-integer :: i, num_points
-real(kind = 8) :: data_range
-
 
 ! To start off, let's try reading program options from standard input.
 read *, input_name, baseline_adjust, tolerance
@@ -536,16 +531,6 @@ call adjust_baseline(points, baseline_adjust)
 call find_peaks(points, peak_list, tolerance)
 call compute_peak_areas(integration_method, points, tolerance, &
   peak_list, peak_areas)
-! @TODO: Remove later: Testing code.
-num_points = 10000
-data_range = points%x(points%length) - points%x(1)
-!print *, points%x
-!do i = 1, num_points
-!  print *, points%x(1) + i * data_range / num_points, &
-!    natural_cubic_spline_interpolation(points%x(1) + i * data_range &
-!      / num_points, points, tolerance)
-!enddo
-print *, peak_list
 ! Open output file for writing. This will be function-ized later.
 ! (First, check if it exists already and delete it if so.)
 open(unit = output_unit, status = "old", access = "sequential", &
