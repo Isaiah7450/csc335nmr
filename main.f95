@@ -373,33 +373,50 @@ contains
     real(kind = 8), dimension(:), allocatable, intent(out) :: peak_list
     real(kind = 8), intent(in) :: tol
     real(kind = 8) :: start, finish, guess, root
-    integer :: iterations, peak_index
+    integer :: iterations, peak_index, i
     logical :: err
     integer, parameter :: initial_size = 26
     allocate(peak_list(initial_size))
-    ! Going to have to think more about how I want to do
-    ! the initial guess and domain.
-    start = points%x(1)
-    finish = points%x(points%length)
-    guess = points%x(1)
     peak_index = 1
+    i = 1
     do while (.true.)
-      iterations = 0
-      root = bisect(natural_cubic_spline_interpolation, &
-        points, start, finish, guess, tol, err, iterations)
-      if (err) then
-        exit
+      ! Search for start.
+      do i = i, points%length
+        if (points%y(i) >= 0D0) exit
+      enddo
+      if (i > points%length) exit
+      ! Find start using bisection.
+      if (i .ne. 1) then
+        iterations = 0
+        guess = (points%x(i) + points%x(i - 1)) / 2D0
+        root = bisect(natural_cubic_spline_interpolation, &
+          points, points%x(i - 1), points%x(i), guess, tol, err, iterations)
+        start = root
+      else
+        start = points%x(1)
       endif
-      peak_list(peak_index) = root
-      start = root
-      guess = root
-      if (peak_index .eq. size(peak_list)) then
+      ! Search for end.
+      do i = i, points%length
+        if (points%y(i) < 0D0) exit
+      enddo
+      ! Find actual finish using bisection.
+      iterations = 0
+      guess = (points%x(i) + points%x(i - 1)) / 2D0
+      root = bisect(natural_cubic_spline_interpolation, &
+        points, points%x(i - 1), points%x(i), guess, tol, err, iterations)
+      if (err) then
+        finish = points%x(points%length)
+      else
+        finish = root
+      endif
+      peak_list(peak_index) = start
+      peak_list(peak_index + 1) = finish
+      peak_index = peak_index + 2
+      if (peak_index + 1 .ge. size(peak_list)) then
         call resize_list(peak_list)
       endif
-      peak_index = peak_index + 1
-      !if (mod(peak_index, 2) .eq. 1) then
-      !endif
     enddo
+    call resize_list(peak_list, peak_index - 1)
   end subroutine find_peaks
 end module main_module
 
@@ -441,16 +458,16 @@ call adjust_tms(points, tms_location)
 call apply_filter(points, filter_type, filter_size, filter_passes)
 call adjust_baseline(points, baseline_adjust)
 call find_peaks(points, peak_list, tolerance)
-print *, peak_list
 ! @TODO: Remove later: Testing code.
-!num_points = 10000
-!data_range = points%x(points%length) - points%x(1)
+num_points = 10000
+data_range = points%x(points%length) - points%x(1)
+!print *, points%x
 !do i = 1, num_points
 !  print *, points%x(1) + i * data_range / num_points, &
 !    natural_cubic_spline_interpolation(points%x(1) + i * data_range &
 !      / num_points, points, tolerance)
 !enddo
-
+print *, peak_list
 ! Open output file for writing. This will be function-ized later.
 ! (First, check if it exists already and delete it if so.)
 open(unit = output_unit, status = "old", access = "sequential", &
