@@ -510,6 +510,16 @@ write(output_unit, *) ""
 write(output_unit, *) "Plot File Data"
 write(output_unit, *) "File", ": ", input_name
 write(output_unit, *) "Plot shifted ", tms_location, " ppm for TMS calibration."
+write(output_unit, *) ""
+write(output_unit, *) ""
+! If nothing else, this definitely should be put in some subroutine.
+write(output_unit, *) "Peak | Begin | End | Location | Top | Area | Hydrogen"
+do i = 1, size(peak_list) / 2
+  write(output_unit, *) i, peak_list(i * 2 - 1), peak_list(i * 2), &
+    (peak_list(i * 2) + peak_list(i * 2 - 1)) / 2D0, &
+    ! Will write the correct values for these later.
+    0D0, 0D0, 0
+enddo
 ! Clean up resources.
 close(output_unit)
 deallocate(points%y_prime)
