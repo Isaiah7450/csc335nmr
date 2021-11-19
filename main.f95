@@ -68,11 +68,11 @@ contains
       print *, "Error: Tolerance should be positive."
     endif
     if (ft .ne. No_Filter .and. ft .ne. SG_Filter .and. &
-      ft .ne. Boxcar_Filter) then
+      ft .ne. Boxcar_Filter .and. ft .ne. DFT_Filter) then
       err = .true.
-      print *, "Error: Filter should be 0, 1, or 2."
+      print *, "Error: Filter should be 0, 1, 2, or 3."
     endif
-    if (ft .ne. No_Filter) then
+    if (ft .ne. No_Filter .and. ft .ne. DFT_Filter) then
       if (fsize .eq. 0) then
         err = .true.
         print *, "Error: Filter size should be positive and odd."
@@ -88,9 +88,19 @@ contains
         err = .true.
         print *, "Error: Number of filter passes should be positive."
       endif
-    else if (passes .ne. 0) then
-      err = .true.
-      print *, "Error: Number of filter passes should be zero."
+    else
+      if (ft .eq. DFT_Filter) then
+        if (fsize .ne. Inverse_DFT &
+          .and. fsize .ne. Direct_DFT &
+          .and. fsize .ne. Iterative_DFT) then
+          err = .true.
+          print *, "Error: Recovery method should be 0, 1, or 2."
+        endif
+      endif
+      if (passes .ne. 0) then
+        err = .true.
+        print *, "Error: Number of filter passes should be zero."
+      endif
     endif
     if (im .ne. Newton_Cotes_Integration_Method &
       .and. im .ne. Romberg_Integration_Method &
@@ -552,10 +562,19 @@ else
     write(output_unit, *) "Boxcar Filtering"
     write(output_unit, *) "Boxcar Size (Cyclic)", ":", filter_size
     write(output_unit, *) "Boxcar Passes", ":", filter_passes
-  else
+  elseif (filter_type .eq. SG_Filter) then
     write(output_unit, *) "Savitzky-Golay Filtering"
     write(output_unit, *) "Filter Size", ":", filter_size
     write(output_unit, *) "Filter Passes", ":", filter_passes
+  else
+    write(output_unit, *) "Discrete Fourier Transform Filtering"
+    if (filter_size .eq. Inverse_DFT) then
+      write(output_unit, *) "Recovery Method: Inverse"
+    elseif (filter_size .eq. Direct_DFT) then
+      write(output_unit, *) "Recovery Method: Direct"
+    else
+      write(output_unit, *) "Recovery Method: Iterative"
+    endif
   endif
 endif
 write(output_unit, *) ""

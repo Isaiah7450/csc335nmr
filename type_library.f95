@@ -13,11 +13,16 @@ implicit none
   integer, parameter :: No_Filter = 0
   integer, parameter :: Boxcar_Filter = 1
   integer, parameter :: SG_Filter = 2
+  integer, parameter :: DFT_Filter = 3
   ! Constants for integration method.
-  integer, parameter :: Newton_Cotes_Integration_Method = 0
+  integer, parameter :: Newton_Cotes_Integration_Method = 2
   integer, parameter :: Romberg_Integration_Method = 1
-  integer, parameter :: Adaptive_Integration_Method = 2
+  integer, parameter :: Adaptive_Integration_Method = 0
   integer, parameter :: Quadrature_Integration_Method = 3
+  ! Constants for DFT recovery.
+  integer, parameter :: Inverse_DFT = 0
+  integer, parameter :: Direct_DFT = 1
+  integer, parameter :: Iterative_DFT = 2
 
   ! This type is used to store a list of points for interpolation.
   type PointList
