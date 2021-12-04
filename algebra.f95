@@ -22,7 +22,7 @@ contains
     do i = 1, n
       temp_sum = dcmplx(0D0, 0D0)
       do j = 1, n
-        temp_sum = temp_sum + A(i, 1) * x(j)
+        temp_sum = temp_sum + A(i, j) * x(j)
       enddo
       b(i) = temp_sum
     enddo

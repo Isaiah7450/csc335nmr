@@ -371,8 +371,7 @@ contains
     integer, intent(in) :: rec_method
     complex(kind = 8), dimension(points%length,points%length) :: Z, G
     complex(kind = 8), dimension(points%length) :: c, y
-    integer, dimension(points%length) :: IPIV
-    integer :: n, INFO, i, j, k
+    integer :: n, i, j, k
     n = points%length
     do i = 1, n
       y(i) = dcmplx(points%y(i), 0D0)
@@ -405,7 +404,39 @@ contains
       c(i) = y(i)
       !print *, i, c(i)
     enddo
+    if (rec_method .eq. Inverse_DFT) then
+      call recover_dft_inverse(Z, c, points%y, n)
+    endif
   end subroutine apply_dft_filter
+
+  ! Recovers the filtered points using the inverse matrix method.
+  ! Z : double complex n * n matrix : The matrix Z used to construct
+  !   the Fourier coefficients.
+  ! c : double complex 1-D array : An n * 1 column vector with the entries
+  !   of the filtered points in the Fourier domain.
+  ! y : double 1-D array : An n * 1 column vector where results will be
+  !   written.
+  ! n : The size of the matrix and vectors.
+  subroutine recover_dft_inverse(Z, c, y, n)
+    implicit none
+    integer, intent(in) :: n
+    complex(kind = 8), dimension(n, n), intent(in) :: Z
+    complex(kind = 8), dimension(n), intent(in) :: c
+    real(kind = 8), dimension(n), intent(inout) :: y
+    integer :: j, k
+    complex(kind = 8), dimension(n, n) :: ZZ
+    complex(kind = 8), dimension(n) :: yy
+    ! Build complex conjugate matrix.
+    do j = 1, n
+      do k = 1, n
+        ZZ(j, k) = conjg(Z(j, k))
+      enddo
+    enddo
+    call matrix_vector_multiply(ZZ, c, yy, n)
+    do j = 1, n
+      y(j) = dble(yy(j))
+    enddo
+  end subroutine
 
   ! This subroutine adjusts all the points so that
   ! only points above the baseline have a positive value.
@@ -553,6 +584,15 @@ contains
         peak_areas(i), nint(peak_areas(i) / smallest_area)
     enddo
   end subroutine write_peak_info
+
+  ! For testing...
+  subroutine debug_test(points)
+    type(PointList), intent(in) :: points
+    integer :: i
+    do i = 1, points%length
+      print *, points%x(i), points%y(i)
+    enddo
+  end subroutine
 end module main_module
 
 program main
@@ -572,7 +612,6 @@ integer, parameter :: output_unit = 18
 type(PointList) :: points
 real(kind = 8) :: tms_location
 real(kind = 8), dimension(:), allocatable :: peak_list, peak_areas
-
 integer :: io_status
 
 ! To start off, let's try reading program options from standard input.
@@ -586,6 +625,11 @@ call read_input(input_name, points)
 tms_location = find_tms(points, baseline_adjust)
 call adjust_tms(points, tms_location)
 call apply_filter(points, filter_type, filter_size, filter_passes)
+
+!call adjust_tms(points, -tms_location)
+!call debug_test(points)
+!call adjust_tms(points, tms_location)
+
 call adjust_baseline(points, baseline_adjust)
 call find_peaks(points, peak_list, tolerance)
 call compute_peak_areas(integration_method, points, tolerance, &
