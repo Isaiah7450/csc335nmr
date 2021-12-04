@@ -4,12 +4,12 @@
 .PHONY := clean rebuild
 Prog_Name := nmr
 
-My_Flags := -g -Wall -Wextra -pedantic-errors
+My_Flags := -g -Wall -Wextra -pedantic-errors -llapack
 
 $(Prog_Name).out: type_library.o root_finder.o interpolation.o \
-  calculus.o main.o
+  calculus.o algebra.o main.o
 > gfortran $(My_Flags) type_library.o root_finder.o \
-    interpolation.o calculus.o main.o -o $(Prog_Name).out
+    interpolation.o calculus.o algebra.o main.o -o $(Prog_Name).out
 
 type_library.o: type_library.f95
 > gfortran $(My_Flags) -c type_library.f95 -o type_library.o
@@ -23,7 +23,11 @@ interpolation.o: interpolate.f95 type_library.o
 calculus.o: calculus.f95 type_library.o
 > gfortran $(My_Flags) -c calculus.f95 -o calculus.o
 
-main.o: main.f95 root_finder.o interpolation.o type_library.o
+algebra.o: algebra.f95 type_library.o
+> gfortran $(My_Flags) -c algebra.f95 -o algebra.o
+
+main.o: main.f95 root_finder.o interpolation.o type_library.o \
+  algebra.o calculus.o
 > gfortran $(My_Flags) -c main.f95 -o main.o
 
 clean:

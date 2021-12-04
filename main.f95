@@ -47,6 +47,7 @@ use utility_module
 use root_finder_library
 use interpolation_library
 use numerical_calculus_library
+use linear_algebra_library
 implicit none
 contains
   ! Checks if the given parameters are valid. If not,
@@ -268,6 +269,8 @@ contains
       call apply_boxcar_filter(points, filter_size, filter_passes)
     elseif (filter_type .eq. SG_Filter) then
       call apply_sg_filter(points, filter_size, filter_passes)
+    elseif (filter_type .eq. DFT_Filter) then
+      call apply_dft_filter(points, filter_size)
     endif
   end subroutine apply_filter
 
@@ -357,6 +360,52 @@ contains
     enddo
     deallocate(filtered_values)
   end subroutine apply_sg_filter
+
+  ! Uses a Discrete Fourier Transform to filter the input points.
+  ! points : PointList : The list of raw data points. The new points
+  !   will be written to this list.
+  ! rec_method : integer : The method to use to recover the filtered array.
+  subroutine apply_dft_filter(points, rec_method)
+    implicit none
+    type(PointList), intent(inout) :: points
+    integer, intent(in) :: rec_method
+    complex(kind = 8), dimension(points%length,points%length) :: Z, G
+    complex(kind = 8), dimension(points%length) :: c, y
+    integer, dimension(points%length) :: IPIV
+    integer :: n, INFO, i, j, k
+    n = points%length
+    do i = 1, n
+      y(i) = dcmplx(points%y(i), 0D0)
+    enddo
+    ! Construct Z matrix.
+    do j = 0, n - 1
+      do k = 0, n - 1
+        Z(j + 1, k + 1) = exp(dcmplx(0D0, -2D0 * pi / n))
+        Z(j + 1, k + 1) = Z(j + 1, k + 1) ** (dcmplx(j * k))
+        Z(j + 1, k + 1) = Z(j + 1, k + 1) / sqrt(dble(n))
+        !print *, Z(j + 1, k + 1)
+      enddo
+    enddo
+    call matrix_vector_multiply(Z, y, c, n)
+    ! Compute the G matrix.
+    do j = 0, n - 1
+      do k = 0, n - 1
+        if (j .eq. k) then
+          G(j + 1, k + 1) = -4D0 * log(2D0) * dble(j) * dble(k)
+          G(j + 1, k + 1) = G(j + 1, k + 1) / (dble(n) ** (1.5D0))
+          G(j + 1, k + 1) = exp(G(j + 1, k + 1))
+          !print *, j, k, G(j + 1, k + 1)
+        else
+          G(j + 1, k + 1) = dcmplx(0D0, 0D0)
+        endif
+      enddo
+    enddo
+    call matrix_vector_multiply(G, c, y, n)
+    do i = 1, n
+      c(i) = y(i)
+      !print *, i, c(i)
+    enddo
+  end subroutine apply_dft_filter
 
   ! This subroutine adjusts all the points so that
   ! only points above the baseline have a positive value.
