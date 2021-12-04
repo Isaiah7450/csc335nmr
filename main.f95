@@ -584,6 +584,15 @@ contains
         peak_areas(i), nint(peak_areas(i) / smallest_area)
     enddo
   end subroutine write_peak_info
+
+  ! For testing...
+  subroutine debug_test(points)
+    type(PointList), intent(in) :: points
+    integer :: i
+    do i = 1, points%length
+      print *, points%x(i), points%y(i)
+    enddo
+  end subroutine
 end module main_module
 
 program main
@@ -603,7 +612,6 @@ integer, parameter :: output_unit = 18
 type(PointList) :: points
 real(kind = 8) :: tms_location
 real(kind = 8), dimension(:), allocatable :: peak_list, peak_areas
-
 integer :: io_status
 
 ! To start off, let's try reading program options from standard input.
@@ -617,6 +625,11 @@ call read_input(input_name, points)
 tms_location = find_tms(points, baseline_adjust)
 call adjust_tms(points, tms_location)
 call apply_filter(points, filter_type, filter_size, filter_passes)
+
+!call adjust_tms(points, -tms_location)
+!call debug_test(points)
+!call adjust_tms(points, tms_location)
+
 call adjust_baseline(points, baseline_adjust)
 call find_peaks(points, peak_list, tolerance)
 call compute_peak_areas(integration_method, points, tolerance, &
