@@ -4,7 +4,7 @@
 .PHONY := clean rebuild
 Prog_Name := nmr
 
-My_Flags := -g -Wall -Wextra -pedantic-errors
+My_Flags := -g -Wall -Wextra -pedantic-errors -llapack
 
 $(Prog_Name).out: type_library.o root_finder.o interpolation.o \
   calculus.o main.o
