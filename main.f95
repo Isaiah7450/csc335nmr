@@ -371,8 +371,7 @@ contains
     integer, intent(in) :: rec_method
     complex(kind = 8), dimension(points%length,points%length) :: Z, G
     complex(kind = 8), dimension(points%length) :: c, y
-    integer, dimension(points%length) :: IPIV
-    integer :: n, INFO, i, j, k
+    integer :: n, i, j, k
     n = points%length
     do i = 1, n
       y(i) = dcmplx(points%y(i), 0D0)
@@ -405,7 +404,39 @@ contains
       c(i) = y(i)
       !print *, i, c(i)
     enddo
+    if (rec_method .eq. Inverse_DFT) then
+      call recover_dft_inverse(Z, c, points%y, n)
+    endif
   end subroutine apply_dft_filter
+
+  ! Recovers the filtered points using the inverse matrix method.
+  ! Z : double complex n * n matrix : The matrix Z used to construct
+  !   the Fourier coefficients.
+  ! c : double complex 1-D array : An n * 1 column vector with the entries
+  !   of the filtered points in the Fourier domain.
+  ! y : double 1-D array : An n * 1 column vector where results will be
+  !   written.
+  ! n : The size of the matrix and vectors.
+  subroutine recover_dft_inverse(Z, c, y, n)
+    implicit none
+    integer, intent(in) :: n
+    complex(kind = 8), dimension(n, n), intent(in) :: Z
+    complex(kind = 8), dimension(n), intent(in) :: c
+    real(kind = 8), dimension(n), intent(inout) :: y
+    integer :: j, k
+    complex(kind = 8), dimension(n, n) :: ZZ
+    complex(kind = 8), dimension(n) :: yy
+    ! Build complex conjugate matrix.
+    do j = 1, n
+      do k = 1, n
+        ZZ(j, k) = conjg(Z(j, k))
+      enddo
+    enddo
+    call matrix_vector_multiply(ZZ, c, yy, n)
+    do j = 1, n
+      y(j) = dble(yy(j))
+    enddo
+  end subroutine
 
   ! This subroutine adjusts all the points so that
   ! only points above the baseline have a positive value.
