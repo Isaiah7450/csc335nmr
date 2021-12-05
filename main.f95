@@ -225,6 +225,8 @@ contains
     logical :: found_start
     integer :: i
     ! Search backwards for the starting and ending points.
+    finish = points%x(points%length)
+    start = points%x(0)
     do i = points%length, 0, -1
       if (.not. found_start) then
         if (points%y(i) > baseline) then
@@ -636,6 +638,8 @@ contains
       do i = 1, size(peak_areas)
         if (peak_areas(i) < smallest_area) smallest_area = peak_areas(i)
       enddo
+    else
+      smallest_area = 1D-20
     endif
     write(output_unit, *) "Peak | Begin | End | Location | Top | Area | Hydrogen"
     do i = 1, size(peak_list) / 2
@@ -689,9 +693,9 @@ tms_location = find_tms(points, baseline_adjust)
 call adjust_tms(points, tms_location)
 call apply_filter(points, filter_type, filter_size, filter_passes, tolerance)
 
-!call adjust_tms(points, -tms_location)
-!call debug_test(points)
-!call adjust_tms(points, tms_location)
+call adjust_tms(points, -tms_location)
+call debug_test(points)
+call adjust_tms(points, tms_location)
 
 call adjust_baseline(points, baseline_adjust)
 call find_peaks(points, peak_list, tolerance)
