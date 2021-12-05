@@ -53,6 +53,7 @@ contains
 
     integer :: i, j, k, p
     real(kind = 8) :: max_magnitude
+    complex(kind = 8) :: lambda
     ! rp is for "row pointer"; we will simulate row changes.
     integer, dimension(n) :: rp
 
@@ -65,17 +66,20 @@ contains
       ! Partial pivoting
       max_magnitude = 0D0
       do j = i, n
+        !print *, i, j, A(rp(j), i)
         if (abs(A(rp(j), i)) > max_magnitude) then
           max_magnitude = abs(A(rp(j), i))
           p = j
         endif
       enddo
+      !print *, i, p, max_magnitude
       if (rp(i) .ne. rp(p)) call swap(rp(i), rp(p))
-      ! Elimination
+      ! Eliminate the cell A_{ji}
       do j = i + 1, n
-        call row_op_scale_plus(A, n, A(rp(j), i) / A(rp(i), i), &
-          rp(i), rp(j))
+        lambda = A(rp(j), i) / A(rp(i), i)
+        call row_op_scale_plus(A, n, -lambda, rp(i), rp(j))
       enddo
+      print *, ""
     enddo
     ! Check for unique solution.
     if (A(rp(n), n) .eq. 0) then
