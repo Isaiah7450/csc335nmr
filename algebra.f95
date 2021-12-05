@@ -80,7 +80,7 @@ contains
       enddo
     enddo
     ! Check for unique solution.
-    if (A(rp(n), n) .eq. 0) then
+    if (A(rp(n), n) .eq. dcmplx(0D0, 0D0)) then
       err = .true.
       x = dcmplx(0D0, 0D0)
       return
@@ -94,7 +94,63 @@ contains
       enddo
       x(i) = x(i) / A(rp(i), i)
     enddo
-    end subroutine solve_matrix_partial_pivoting
+  end subroutine solve_matrix_partial_pivoting
+
+! Computes the solution to Ax = b using the Jacobi iterative method.
+! A : 2-D double complex array : The augmented matrix [A | b] as a
+!   n by n + 1 two-dimensional array. The matrix should be in
+!   row-major order.
+! n : integer : The number of equations to solve.
+! x : double complex array : This array contains the initial approximation.
+! err : logical : Flag indicating whether or not an error occurred.
+! tol : double : The tolerance to use to determine when to stop.
+! max_iters : integer : The maximum number of iterations or 0 for no limit.
+! norm : function : Function to call to compute the norm of a vector. Used
+!   to determine how close the approximation is to the actual value.
+  subroutine solve_matrix_jacobi_method(A, x, n, err, tol, max_iters, norm)
+    integer, intent(in) :: n, max_iters
+    complex(kind = 8), dimension(n, n + 1), intent(in) :: A
+    complex(kind = 8), dimension(n), intent(inout) :: x
+    real(kind = 8), intent(in) :: tol
+    logical, intent(out) :: err
+    interface
+      ! This function takes in two vectors and computes the magnitude
+      ! of the difference.
+      pure function norm(x, x0) result(out)
+        complex(kind = 8), dimension(:), intent(in) :: x, x0
+        real(kind = 8) :: out
+      end function norm
+    end interface
+    integer :: i, j, iters
+    complex(kind = 8), dimension(:), allocatable :: x0
+    complex(kind = 8) :: temp_sum
+    allocate(x0(n))
+    do i = 1, n
+      x0(i) = x(i)
+    enddo
+    iters = 1
+    err = .false.
+    do while (iters <= max_iters .or. max_iters .eq. 0)
+      do i = 1, n
+        temp_sum = 0D0
+        do j = 1, n
+          if (j .eq. i) cycle
+          temp_sum = temp_sum + A(i, j) * x0(j)
+        enddo
+        x(i) = (-temp_sum + A(i, n + 1)) / A(i, i)
+      enddo
+      if (norm(x, x0) < tol) exit
+      ! Copy over values.
+      do j = 1, n
+        x0(j) = x(j)
+      enddo
+      iters = iters + 1
+      if (iters > max_iters .and. max_iters .ne. 0) then
+        err = .true.
+      endif
+    enddo
+    deallocate(x0)
+  end subroutine solve_matrix_jacobi_method
 
   ! Utility subroutines.
   subroutine swap_integer(a, b)
