@@ -461,6 +461,25 @@ contains
     complex(kind = 8), dimension(n, n), intent(in) :: Z
     complex(kind = 8), dimension(n), intent(in) :: c
     real(kind = 8), dimension(n), intent(inout) :: y
+    complex(kind = 8), dimension(n, n + 1) :: ZZ
+    complex(kind = 8), dimension(n) :: yy
+    integer :: i, j
+    logical :: err
+    ! Build augmented matrix.
+    do i = 1, n
+      do j = 1, n
+        ZZ(i, j) = Z(i, j)
+      enddo
+      ZZ(i, n + 1) = c(i)
+    enddo
+    call solve_matrix_partial_pivoting(ZZ, yy, n, err)
+    if (err) then
+      print *, "Error: No unique solution to Zy = c found."
+      call exit(1)
+    endif
+    do i = 1, n
+      y(i) = real(yy(i))
+    enddo
   end subroutine recover_dft_direct
 
   ! Recovers the filtered points by solving Z y = c using the Jacobi
