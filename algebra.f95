@@ -83,9 +83,16 @@ contains
       x = dcmplx(0D0, 0D0)
       return
     endif
-    x = dcmplx(0D0, 0D0)
     ! Start back-substitution
-  end subroutine solve_matrix_partial_pivoting
+    x(n) = A(rp(n), n + 1) / A(rp(n), n)
+    do i = n - 1, 1, -1
+      x(i) = A(rp(i), n + 1)
+      do j = i + 1, n
+        x(i) = x(i) - A(rp(i), j) * x(j)
+      enddo
+      x(i) = x(i) / A(rp(i), i)
+    enddo
+    end subroutine solve_matrix_partial_pivoting
 
   ! Utility subroutines.
   subroutine swap_integer(a, b)
