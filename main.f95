@@ -225,6 +225,8 @@ contains
     logical :: found_start
     integer :: i
     ! Search backwards for the starting and ending points.
+    finish = points%x(points%length)
+    start = points%x(0)
     do i = points%length, 0, -1
       if (.not. found_start) then
         if (points%y(i) > baseline) then
@@ -260,17 +262,19 @@ contains
   ! filter_size : integer : The number of points to use in the filter.
   ! filter_passes : integer : The number of times to recursively apply
   !   the filter.
-  subroutine apply_filter(points, filter_type, filter_size, filter_passes)
-    use numeric_type_library
+  ! tol : double : Tolerance for numerical algorithms.
+  subroutine apply_filter(points, filter_type, filter_size, &
+    filter_passes, tol)
     implicit none
     type(PointList), intent(inout) :: points
     integer, intent(in) :: filter_type, filter_size, filter_passes
+    real(kind = 8), intent(in) :: tol
     if (filter_type .eq. Boxcar_Filter) then
       call apply_boxcar_filter(points, filter_size, filter_passes)
     elseif (filter_type .eq. SG_Filter) then
       call apply_sg_filter(points, filter_size, filter_passes)
     elseif (filter_type .eq. DFT_Filter) then
-      call apply_dft_filter(points, filter_size)
+      call apply_dft_filter(points, filter_size, tol)
     endif
   end subroutine apply_filter
 
@@ -365,10 +369,12 @@ contains
   ! points : PointList : The list of raw data points. The new points
   !   will be written to this list.
   ! rec_method : integer : The method to use to recover the filtered array.
-  subroutine apply_dft_filter(points, rec_method)
+  ! tol : double : Tolerance for numerical algorithms.
+  subroutine apply_dft_filter(points, rec_method, tol)
     implicit none
     type(PointList), intent(inout) :: points
     integer, intent(in) :: rec_method
+    real(kind = 8), intent(in) :: tol
     complex(kind = 8), dimension(points%length,points%length) :: Z, G
     complex(kind = 8), dimension(points%length) :: c, y
     integer :: n, i, j, k
@@ -406,6 +412,10 @@ contains
     enddo
     if (rec_method .eq. Inverse_DFT) then
       call recover_dft_inverse(Z, c, points%y, n)
+    elseif (rec_method .eq. Direct_DFT) then
+      call recover_dft_direct(Z, c, points%y, n)
+    elseif (rec_method .eq. Iterative_DFT) then
+      call recover_dft_iterative(Z, c, points%y, n, tol)
     endif
   end subroutine apply_dft_filter
 
@@ -416,7 +426,7 @@ contains
   !   of the filtered points in the Fourier domain.
   ! y : double 1-D array : An n * 1 column vector where results will be
   !   written.
-  ! n : The size of the matrix and vectors.
+  ! n : integer : The size of the matrix and vectors.
   subroutine recover_dft_inverse(Z, c, y, n)
     implicit none
     integer, intent(in) :: n
@@ -437,6 +447,61 @@ contains
       y(j) = dble(yy(j))
     enddo
   end subroutine
+
+  ! Recovers the filtered points by solving Z y = c using Gaussian
+  !   elimination with partial pivoting.
+  ! Z : double complex n * n matrix : The matrix Z used to construct
+  !   the Fourier coefficients.
+  ! c : double complex 1-D array : An n * 1 column vector with the entries
+  !   of the filtered points in the Fourier domain.
+  ! y : double 1-D array : An n * 1 column vector where results will be
+  !   written.
+  ! n : integer : The size of the matrix and vectors.
+  subroutine recover_dft_direct(Z, c, y, n)
+    implicit none
+    integer, intent(in) :: n
+    complex(kind = 8), dimension(n, n), intent(in) :: Z
+    complex(kind = 8), dimension(n), intent(in) :: c
+    real(kind = 8), dimension(n), intent(inout) :: y
+    complex(kind = 8), dimension(n, n + 1) :: ZZ
+    complex(kind = 8), dimension(n) :: yy
+    integer :: i, j
+    logical :: err
+    ! Build augmented matrix.
+    do i = 1, n
+      do j = 1, n
+        ZZ(i, j) = Z(i, j)
+      enddo
+      ZZ(i, n + 1) = c(i)
+    enddo
+    call solve_matrix_partial_pivoting(ZZ, yy, n, err)
+    if (err) then
+      print *, "Error: No unique solution to Zy = c found."
+      call exit(1)
+    endif
+    do i = 1, n
+      y(i) = real(yy(i))
+    enddo
+  end subroutine recover_dft_direct
+
+  ! Recovers the filtered points by solving Z y = c using the Jacobi
+  !   method and the infinity norm.
+  ! Z : double complex n * n matrix : The matrix Z used to construct
+  !   the Fourier coefficients.
+  ! c : double complex 1-D array : An n * 1 column vector with the entries
+  !   of the filtered points in the Fourier domain.
+  ! y : double 1-D array : An n * 1 column vector where results will be
+  !   written.
+  ! n : integer : The size of the matrix and vectors.
+  ! tol : double : The tolerance for numerical algorithms.
+  subroutine recover_dft_iterative(Z, c, y, n, tol)
+    implicit none
+    integer, intent(in) :: n
+    complex(kind = 8), dimension(n, n), intent(in) :: Z
+    complex(kind = 8), dimension(n), intent(in) :: c
+    real(kind = 8), dimension(n), intent(inout) :: y
+    real(kind = 8), intent(in) :: tol
+  end subroutine recover_dft_iterative
 
   ! This subroutine adjusts all the points so that
   ! only points above the baseline have a positive value.
@@ -573,6 +638,8 @@ contains
       do i = 1, size(peak_areas)
         if (peak_areas(i) < smallest_area) smallest_area = peak_areas(i)
       enddo
+    else
+      smallest_area = 1D-20
     endif
     write(output_unit, *) "Peak | Begin | End | Location | Top | Area | Hydrogen"
     do i = 1, size(peak_list) / 2
@@ -624,7 +691,7 @@ call read_input(input_name, points)
 !print *, points%x
 tms_location = find_tms(points, baseline_adjust)
 call adjust_tms(points, tms_location)
-call apply_filter(points, filter_type, filter_size, filter_passes)
+call apply_filter(points, filter_type, filter_size, filter_passes, tolerance)
 
 !call adjust_tms(points, -tms_location)
 !call debug_test(points)
