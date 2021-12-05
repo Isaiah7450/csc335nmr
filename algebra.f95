@@ -21,7 +21,7 @@ contains
     complex(kind = 8), dimension(n, n), intent(in) :: A
     complex(kind = 8), dimension(n), intent(in) :: x
     complex(kind = 8), dimension(n), intent(out) :: b
-    integer :: i, j, k
+    integer :: i, j
     complex(kind = 8) :: temp_sum
     do i = 1, n
       temp_sum = dcmplx(0D0, 0D0)
@@ -139,7 +139,13 @@ contains
         enddo
         x(i) = (-temp_sum + A(i, n + 1)) / A(i, i)
       enddo
-      if (norm(x, x0) < tol) exit
+      if (norm(x, x0) < tol) then
+        exit
+      ! Pretty good sign we are diverging to NaN.
+      elseif (norm(x, x0) >= 1D250) then
+        err = .true.
+        exit
+      endif
       ! Copy over values.
       do j = 1, n
         x0(j) = x(j)
