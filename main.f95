@@ -689,9 +689,9 @@ tms_location = find_tms(points, baseline_adjust)
 call adjust_tms(points, tms_location)
 call apply_filter(points, filter_type, filter_size, filter_passes, tolerance)
 
-call adjust_tms(points, -tms_location)
-call debug_test(points)
-call adjust_tms(points, tms_location)
+!call adjust_tms(points, -tms_location)
+!call debug_test(points)
+!call adjust_tms(points, tms_location)
 
 call adjust_baseline(points, baseline_adjust)
 call find_peaks(points, peak_list, tolerance)

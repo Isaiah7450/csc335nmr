@@ -51,7 +51,7 @@ contains
     complex(kind = 8), dimension(n), intent(out) :: x
     logical, intent(out) :: err
 
-    integer :: i, j, k, p
+    integer :: i, j, p
     real(kind = 8) :: max_magnitude
     complex(kind = 8) :: lambda
     ! rp is for "row pointer"; we will simulate row changes.
@@ -65,6 +65,7 @@ contains
     do i = 1, n - 1
       ! Partial pivoting
       max_magnitude = 0D0
+      p = i
       do j = i, n
         if (abs(A(rp(j), i)) > max_magnitude) then
           max_magnitude = abs(A(rp(j), i))
