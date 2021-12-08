@@ -501,6 +501,25 @@ contains
     complex(kind = 8), dimension(n), intent(in) :: c
     real(kind = 8), dimension(n), intent(inout) :: y
     real(kind = 8), intent(in) :: tol
+    complex(kind = 8), dimension(n, n + 1) :: ZZ
+    complex(kind = 8), dimension(n) :: yy
+    integer :: i, j, iters
+    logical :: err
+    ! Build augmented matrix.
+    do i = 1, n
+      do j = 1, n
+        ZZ(i, j) = Z(i, j)
+      enddo
+      ZZ(i, n + 1) = c(i)
+    enddo
+    yy = (/ (dcmplx(y(i), 0D0), i = 1, n) /)
+    iters = 10000
+    call solve_matrix_jacobi_method(ZZ, yy, n, err, tol, iters, infinity_norm)
+    if (err) then
+      print *, "Error: Failed to obtain an iterative solution to Zy = c."
+      call exit(1)
+    endif
+    y = (/ (real(yy(i)), i = 1, n) /)
   end subroutine recover_dft_iterative
 
   ! This subroutine adjusts all the points so that
@@ -652,6 +671,20 @@ contains
     enddo
   end subroutine write_peak_info
 
+  ! Compute the infinity norm of two complex vectors.
+  pure function infinity_norm(x, x0) result(out)
+    complex(kind = 8), dimension(:), intent(in) :: x, x0
+    real(kind = 8) :: out
+    real(kind = 8) :: temp
+    integer :: i, n
+    out = 0D0
+    n = size(x)
+    do i = 1, n
+      temp = abs(x(i) - x0(i))
+      if (temp > out) out = temp
+    enddo
+  end function infinity_norm
+
   ! For testing...
   subroutine debug_test(points)
     type(PointList), intent(in) :: points
@@ -688,7 +721,6 @@ read *, integration_method, output_name
 call validate_parameters(tolerance, filter_type, &
   filter_size, filter_passes, integration_method) 
 call read_input(input_name, points)
-!print *, points%x
 tms_location = find_tms(points, baseline_adjust)
 call adjust_tms(points, tms_location)
 call apply_filter(points, filter_type, filter_size, filter_passes, tolerance)
