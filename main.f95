@@ -689,21 +689,6 @@ contains
   subroutine debug_test(points)
     type(PointList), intent(in) :: points
     integer :: i
-    complex(kind = 8), dimension(3,4) :: A
-    complex(kind = 8), dimension(3) :: x
-    logical :: err
-    !A = transpose( &
-    !  reshape( (/ 3D0, -1D0, 1D0, 1D0, &
-    !    3D0, 6D0, 2D0, 0D0, &
-    !    3D0, 3D0, 7D0, 4D0 /), &
-    !    shape(transpose(A)) &
-    !  ) &
-    !)
-    !x = dcmplx(0D0, 0D0)
-    !call solve_matrix_jacobi_method(A, x, 3, err, 1D-3, 1000, infinity_norm)
-    !do i = 1, 3
-    !  print *, i, x(i)
-    !enddo
     do i = 1, points%length
       print *, points%x(i), points%y(i)
     enddo
@@ -740,9 +725,9 @@ tms_location = find_tms(points, baseline_adjust)
 call adjust_tms(points, tms_location)
 call apply_filter(points, filter_type, filter_size, filter_passes, tolerance)
 
-call adjust_tms(points, -tms_location)
-call debug_test(points)
-call adjust_tms(points, tms_location)
+!call adjust_tms(points, -tms_location)
+!call debug_test(points)
+!call adjust_tms(points, tms_location)
 
 call adjust_baseline(points, baseline_adjust)
 call find_peaks(points, peak_list, tolerance)
