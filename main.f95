@@ -215,31 +215,40 @@ contains
 
   ! Finds the TMS peak of the provided points list.
   ! points : PointList : The set of points to search.
-  ! baseline : double : The location of the baseline.
+  ! tol : double : The tolerance for numerical algorithms.
   ! returns : double : The location of the TMS peak.
-  function find_tms(points, baseline) result(out)
+  function find_tms(points, tol) result(out)
     type(PointList), intent(in) :: points
-    real(kind = 8), intent(in) :: baseline
+    real(kind = 8), intent(in) :: tol
     real(kind = 8) :: out
-    real(kind = 8) :: start, finish
-    logical :: found_start
-    integer :: i
+    real(kind = 8) :: start, finish, guess
+    integer :: i, iterations
+    logical :: err
     ! Search backwards for the starting and ending points.
     finish = points%x(points%length)
-    start = points%x(0)
+    start = points%x(1)
     do i = points%length, 0, -1
-      if (.not. found_start) then
-        if (points%y(i) > baseline) then
-          finish = points%x(i)
-          found_start = .true.
-        endif
-      else
-        if (points%y(i) < baseline) then
-          start = points%x(i)
-          exit
-        endif
-      endif
+      if (points%y(i) > 0D0) exit
     enddo
+    ! Find true finish using bisection.
+    if (i .ne. 0) then
+      iterations = 0
+      guess = (points%x(i) + points%x(i + 1)) / 2D0
+      finish = bisect(natural_cubic_spline_interpolation, &
+        points, points%x(i), points%x(i + 1), guess, tol, err, iterations)
+    endif
+    ! Find start.
+    if (i .ne. 0) then
+      do i = i, 0, -1
+        if (points%y(i) < 0D0) exit
+      enddo
+      if (i .ne. 0) then
+        iterations = 0
+        guess = (points%x(i) + points%x(i + 1)) / 2D0
+        start = bisect(natural_cubic_spline_interpolation, &
+          points, points%x(i), points%x(i + 1), guess, tol, err, iterations)
+      endif
+    endif
     out = (start + finish) / 2D0
   end function find_tms
 
@@ -721,7 +730,11 @@ read *, integration_method, output_name
 call validate_parameters(tolerance, filter_type, &
   filter_size, filter_passes, integration_method) 
 call read_input(input_name, points)
-tms_location = find_tms(points, baseline_adjust)
+
+call adjust_baseline(points, baseline_adjust)
+tms_location = find_tms(points, tolerance)
+call adjust_baseline(points, -baseline_adjust)
+
 call adjust_tms(points, tms_location)
 call apply_filter(points, filter_type, filter_size, filter_passes, tolerance)
 
